@@ -51,6 +51,13 @@ impl AbnormalFraction {
             AbnormalFraction::NegInfinite => true,
         }
     }
+
+    pub(crate) fn both_normal(&self, rhs: &Self) -> bool {
+        match (self, rhs) {
+            (AbnormalFraction::Normal(_), AbnormalFraction::Normal(_)) => true,
+            _ => false,
+        }
+    }
 }
 
 impl Display for AbnormalFraction {
@@ -271,7 +278,9 @@ impl Add for &AbnormalFraction {
 
     fn add(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
-            (AbnormalFraction::Normal(f1), AbnormalFraction::Normal(f2)) => AbnormalFraction::Normal(f1 + f2),
+            (AbnormalFraction::Normal(f1), AbnormalFraction::Normal(f2)) => {
+                AbnormalFraction::Normal(f1 + f2)
+            }
             (AbnormalFraction::Normal(_), AbnormalFraction::Infinite) => AbnormalFraction::Infinite,
             (AbnormalFraction::Normal(_), AbnormalFraction::NegInfinite) => {
                 AbnormalFraction::NegInfinite
@@ -294,11 +303,34 @@ impl Add for &AbnormalFraction {
 
 impl AddAssign for AbnormalFraction {
     fn add_assign(&mut self, rhs: Self) {
-        match self {
-            AbnormalFraction::Normal(f) => todo!(),
-            AbnormalFraction::Infinite => todo!(),
-            AbnormalFraction::NegInfinite => todo!(),
-            AbnormalFraction::NaN => todo!(),
+        if self.both_normal(&rhs) {
+            if let (AbnormalFraction::Normal(f1), AbnormalFraction::Normal(f2)) = (self, rhs) {
+                *f1 += f2;
+            } else {
+                unreachable!()
+            }
+        } else {
+            match (&self, &rhs) {
+                (AbnormalFraction::Normal(_), AbnormalFraction::Normal(_)) => unreachable!(),
+                (AbnormalFraction::Normal(_), AbnormalFraction::Infinite) => {
+                    *self = AbnormalFraction::Infinite;
+                }
+                (AbnormalFraction::Normal(_), AbnormalFraction::NegInfinite) => {
+                    *self = AbnormalFraction::NegInfinite;
+                }
+                (AbnormalFraction::Infinite, AbnormalFraction::Normal(_)) => {}
+                (AbnormalFraction::Infinite, AbnormalFraction::Infinite) => {}
+                (AbnormalFraction::Infinite, AbnormalFraction::NegInfinite) => {
+                    *self = AbnormalFraction::NaN;
+                }
+                (AbnormalFraction::NegInfinite, AbnormalFraction::Normal(_)) => {}
+                (AbnormalFraction::NegInfinite, AbnormalFraction::Infinite) => {
+                    *self = AbnormalFraction::NaN;
+                }
+                (AbnormalFraction::NegInfinite, AbnormalFraction::NegInfinite) => {}
+                (_, AbnormalFraction::NaN) => *self = AbnormalFraction::NaN,
+                (AbnormalFraction::NaN, _) => {}
+            };
         }
     }
 }
@@ -307,11 +339,30 @@ impl Sub for AbnormalFraction {
     type Output = AbnormalFraction;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        match self {
-            AbnormalFraction::Normal(f) => todo!(),
-            AbnormalFraction::Infinite => todo!(),
-            AbnormalFraction::NegInfinite => todo!(),
-            AbnormalFraction::NaN => todo!(),
+        match (&self, &rhs) {
+            (AbnormalFraction::Normal(f1), AbnormalFraction::Normal(f2)) => {
+                AbnormalFraction::Normal(f1 - f2)
+            }
+            (AbnormalFraction::Normal(_), AbnormalFraction::Infinite) => {
+                AbnormalFraction::NegInfinite
+            }
+            (AbnormalFraction::Normal(_), AbnormalFraction::NegInfinite) => {
+                AbnormalFraction::Infinite
+            }
+            (AbnormalFraction::Infinite, AbnormalFraction::Normal(_)) => AbnormalFraction::Infinite,
+            (AbnormalFraction::Infinite, AbnormalFraction::Infinite) => AbnormalFraction::NaN,
+            (AbnormalFraction::Infinite, AbnormalFraction::NegInfinite) => {
+                AbnormalFraction::Infinite
+            }
+            (AbnormalFraction::NegInfinite, AbnormalFraction::Normal(_)) => {
+                AbnormalFraction::NegInfinite
+            }
+            (AbnormalFraction::NegInfinite, AbnormalFraction::Infinite) => {
+                AbnormalFraction::NegInfinite
+            }
+            (AbnormalFraction::NegInfinite, AbnormalFraction::NegInfinite) => AbnormalFraction::NaN,
+            (_, AbnormalFraction::NaN) => AbnormalFraction::NaN,
+            (AbnormalFraction::NaN, _) => AbnormalFraction::NaN,
         }
     }
 }
@@ -320,22 +371,64 @@ impl Sub for &AbnormalFraction {
     type Output = AbnormalFraction;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        match self {
-            AbnormalFraction::Normal(f) => todo!(),
-            AbnormalFraction::Infinite => todo!(),
-            AbnormalFraction::NegInfinite => todo!(),
-            AbnormalFraction::NaN => todo!(),
+        match (&self, &rhs) {
+            (AbnormalFraction::Normal(f1), AbnormalFraction::Normal(f2)) => {
+                AbnormalFraction::Normal(f1 - f2)
+            }
+            (AbnormalFraction::Normal(_), AbnormalFraction::Infinite) => {
+                AbnormalFraction::NegInfinite
+            }
+            (AbnormalFraction::Normal(_), AbnormalFraction::NegInfinite) => {
+                AbnormalFraction::Infinite
+            }
+            (AbnormalFraction::Infinite, AbnormalFraction::Normal(_)) => AbnormalFraction::Infinite,
+            (AbnormalFraction::Infinite, AbnormalFraction::Infinite) => AbnormalFraction::NaN,
+            (AbnormalFraction::Infinite, AbnormalFraction::NegInfinite) => {
+                AbnormalFraction::Infinite
+            }
+            (AbnormalFraction::NegInfinite, AbnormalFraction::Normal(_)) => {
+                AbnormalFraction::NegInfinite
+            }
+            (AbnormalFraction::NegInfinite, AbnormalFraction::Infinite) => {
+                AbnormalFraction::NegInfinite
+            }
+            (AbnormalFraction::NegInfinite, AbnormalFraction::NegInfinite) => AbnormalFraction::NaN,
+            (_, AbnormalFraction::NaN) => AbnormalFraction::NaN,
+            (AbnormalFraction::NaN, _) => AbnormalFraction::NaN,
         }
     }
 }
 
 impl SubAssign for AbnormalFraction {
     fn sub_assign(&mut self, rhs: Self) {
-        match self {
-            AbnormalFraction::Normal(f) => todo!(),
-            AbnormalFraction::Infinite => todo!(),
-            AbnormalFraction::NegInfinite => todo!(),
-            AbnormalFraction::NaN => todo!(),
+        if self.both_normal(&rhs) {
+            if let (AbnormalFraction::Normal(f1), AbnormalFraction::Normal(f2)) = (self, rhs) {
+                *f1 -= f2;
+            } else {
+                unreachable!()
+            }
+        } else {
+            match (&self, &rhs) {
+                (AbnormalFraction::Normal(_), AbnormalFraction::Normal(_)) => unreachable!(),
+                (AbnormalFraction::Normal(_), AbnormalFraction::Infinite) => {
+                    *self = AbnormalFraction::NegInfinite;
+                }
+                (AbnormalFraction::Normal(_), AbnormalFraction::NegInfinite) => {
+                    *self = AbnormalFraction::Infinite;
+                }
+                (AbnormalFraction::Infinite, AbnormalFraction::Normal(_)) => {}
+                (AbnormalFraction::Infinite, AbnormalFraction::Infinite) => {
+                    *self = AbnormalFraction::NaN;
+                }
+                (AbnormalFraction::Infinite, AbnormalFraction::NegInfinite) => {}
+                (AbnormalFraction::NegInfinite, AbnormalFraction::Normal(_)) => {}
+                (AbnormalFraction::NegInfinite, AbnormalFraction::Infinite) => {}
+                (AbnormalFraction::NegInfinite, AbnormalFraction::NegInfinite) => {
+                    *self = AbnormalFraction::NaN;
+                }
+                (_, AbnormalFraction::NaN) => *self = AbnormalFraction::NaN,
+                (AbnormalFraction::NaN, _) => {}
+            };
         }
     }
 }
@@ -344,11 +437,55 @@ impl Mul for AbnormalFraction {
     type Output = AbnormalFraction;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        match self {
-            AbnormalFraction::Normal(f) => todo!(),
-            AbnormalFraction::Infinite => todo!(),
-            AbnormalFraction::NegInfinite => todo!(),
-            AbnormalFraction::NaN => todo!(),
+        match (&self, &rhs) {
+            (AbnormalFraction::Normal(f1), AbnormalFraction::Normal(f2)) => {
+                AbnormalFraction::Normal(f1 * f2)
+            }
+            (AbnormalFraction::Normal(f), AbnormalFraction::Infinite) if f.is_positive() => {
+                AbnormalFraction::Infinite
+            }
+            (AbnormalFraction::Normal(f), AbnormalFraction::Infinite) if f.is_negative() => {
+                AbnormalFraction::NegInfinite
+            }
+            (AbnormalFraction::Normal(_), AbnormalFraction::Infinite) => AbnormalFraction::NaN,
+
+            (AbnormalFraction::Normal(f), AbnormalFraction::NegInfinite) if f.is_positive() => {
+                AbnormalFraction::NegInfinite
+            }
+            (AbnormalFraction::Normal(f), AbnormalFraction::NegInfinite) if f.is_negative() => {
+                AbnormalFraction::Infinite
+            }
+            (AbnormalFraction::Normal(_), AbnormalFraction::NegInfinite) => AbnormalFraction::NaN,
+
+            (AbnormalFraction::Infinite, AbnormalFraction::Normal(f)) if f.is_positive() => {
+                AbnormalFraction::Infinite
+            }
+            (AbnormalFraction::Infinite, AbnormalFraction::Normal(f)) if f.is_negative() => {
+                AbnormalFraction::NegInfinite
+            }
+            (AbnormalFraction::Infinite, AbnormalFraction::Normal(_)) => AbnormalFraction::NaN,
+
+            (AbnormalFraction::Infinite, AbnormalFraction::Infinite) => AbnormalFraction::Infinite,
+            (AbnormalFraction::Infinite, AbnormalFraction::NegInfinite) => {
+                AbnormalFraction::NegInfinite
+            }
+
+            (AbnormalFraction::NegInfinite, AbnormalFraction::Normal(f)) if f.is_positive() => {
+                AbnormalFraction::NegInfinite
+            }
+            (AbnormalFraction::NegInfinite, AbnormalFraction::Normal(f)) if f.is_negative() => {
+                AbnormalFraction::Infinite
+            }
+            (AbnormalFraction::NegInfinite, AbnormalFraction::Normal(_)) => AbnormalFraction::NaN,
+
+            (AbnormalFraction::NegInfinite, AbnormalFraction::Infinite) => {
+                AbnormalFraction::NegInfinite
+            }
+            (AbnormalFraction::NegInfinite, AbnormalFraction::NegInfinite) => {
+                AbnormalFraction::Infinite
+            }
+            (_, AbnormalFraction::NaN) => AbnormalFraction::NaN,
+            (AbnormalFraction::NaN, _) => AbnormalFraction::NaN,
         }
     }
 }
@@ -357,11 +494,55 @@ impl Mul for &AbnormalFraction {
     type Output = AbnormalFraction;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        match self {
-            AbnormalFraction::Normal(f) => todo!(),
-            AbnormalFraction::Infinite => todo!(),
-            AbnormalFraction::NegInfinite => todo!(),
-            AbnormalFraction::NaN => todo!(),
+        match (&self, &rhs) {
+            (AbnormalFraction::Normal(f1), AbnormalFraction::Normal(f2)) => {
+                AbnormalFraction::Normal(f1 * f2)
+            }
+            (AbnormalFraction::Normal(f), AbnormalFraction::Infinite) if f.is_positive() => {
+                AbnormalFraction::Infinite
+            }
+            (AbnormalFraction::Normal(f), AbnormalFraction::Infinite) if f.is_negative() => {
+                AbnormalFraction::NegInfinite
+            }
+            (AbnormalFraction::Normal(_), AbnormalFraction::Infinite) => AbnormalFraction::NaN,
+
+            (AbnormalFraction::Normal(f), AbnormalFraction::NegInfinite) if f.is_positive() => {
+                AbnormalFraction::NegInfinite
+            }
+            (AbnormalFraction::Normal(f), AbnormalFraction::NegInfinite) if f.is_negative() => {
+                AbnormalFraction::Infinite
+            }
+            (AbnormalFraction::Normal(_), AbnormalFraction::NegInfinite) => AbnormalFraction::NaN,
+
+            (AbnormalFraction::Infinite, AbnormalFraction::Normal(f)) if f.is_positive() => {
+                AbnormalFraction::Infinite
+            }
+            (AbnormalFraction::Infinite, AbnormalFraction::Normal(f)) if f.is_negative() => {
+                AbnormalFraction::NegInfinite
+            }
+            (AbnormalFraction::Infinite, AbnormalFraction::Normal(_)) => AbnormalFraction::NaN,
+
+            (AbnormalFraction::Infinite, AbnormalFraction::Infinite) => AbnormalFraction::Infinite,
+            (AbnormalFraction::Infinite, AbnormalFraction::NegInfinite) => {
+                AbnormalFraction::NegInfinite
+            }
+
+            (AbnormalFraction::NegInfinite, AbnormalFraction::Normal(f)) if f.is_positive() => {
+                AbnormalFraction::NegInfinite
+            }
+            (AbnormalFraction::NegInfinite, AbnormalFraction::Normal(f)) if f.is_negative() => {
+                AbnormalFraction::Infinite
+            }
+            (AbnormalFraction::NegInfinite, AbnormalFraction::Normal(_)) => AbnormalFraction::NaN,
+
+            (AbnormalFraction::NegInfinite, AbnormalFraction::Infinite) => {
+                AbnormalFraction::NegInfinite
+            }
+            (AbnormalFraction::NegInfinite, AbnormalFraction::NegInfinite) => {
+                AbnormalFraction::Infinite
+            }
+            (_, AbnormalFraction::NaN) => AbnormalFraction::NaN,
+            (AbnormalFraction::NaN, _) => AbnormalFraction::NaN,
         }
     }
 }
@@ -370,11 +551,41 @@ impl Div for AbnormalFraction {
     type Output = AbnormalFraction;
 
     fn div(self, rhs: Self) -> Self::Output {
-        match self {
-            AbnormalFraction::Normal(f) => todo!(),
-            AbnormalFraction::Infinite => todo!(),
-            AbnormalFraction::NegInfinite => todo!(),
-            AbnormalFraction::NaN => todo!(),
+        match (&self, &rhs) {
+            (AbnormalFraction::Normal(f1), AbnormalFraction::Normal(f2)) if !f2.is_zero() => {
+                AbnormalFraction::Normal(f1 / f2)
+            }
+            (AbnormalFraction::Normal(_), AbnormalFraction::Normal(_)) => AbnormalFraction::NaN,
+            (AbnormalFraction::Normal(_), AbnormalFraction::Infinite) => {
+                AbnormalFraction::Normal(Fraction::zero())
+            }
+            (AbnormalFraction::Normal(_), AbnormalFraction::NegInfinite) => {
+                AbnormalFraction::Normal(Fraction::zero())
+            }
+
+            (AbnormalFraction::Infinite, AbnormalFraction::Normal(f)) if f.is_positive() => {
+                AbnormalFraction::Infinite
+            }
+            (AbnormalFraction::Infinite, AbnormalFraction::Normal(f)) if f.is_negative() => {
+                AbnormalFraction::NegInfinite
+            }
+            (AbnormalFraction::Infinite, AbnormalFraction::Normal(_)) => AbnormalFraction::NaN,
+
+            (AbnormalFraction::Infinite, AbnormalFraction::Infinite) => AbnormalFraction::NaN,
+            (AbnormalFraction::Infinite, AbnormalFraction::NegInfinite) => AbnormalFraction::NaN,
+
+            (AbnormalFraction::NegInfinite, AbnormalFraction::Normal(f)) if f.is_positive() => {
+                AbnormalFraction::NegInfinite
+            }
+            (AbnormalFraction::NegInfinite, AbnormalFraction::Normal(f)) if f.is_negative() => {
+                AbnormalFraction::Infinite
+            }
+            (AbnormalFraction::NegInfinite, AbnormalFraction::Normal(_)) => AbnormalFraction::NaN,
+
+            (AbnormalFraction::NegInfinite, AbnormalFraction::Infinite) => AbnormalFraction::NaN,
+            (AbnormalFraction::NegInfinite, AbnormalFraction::NegInfinite) => AbnormalFraction::NaN,
+            (_, AbnormalFraction::NaN) => AbnormalFraction::NaN,
+            (AbnormalFraction::NaN, _) => AbnormalFraction::NaN,
         }
     }
 }
@@ -383,30 +594,60 @@ impl Div for &AbnormalFraction {
     type Output = AbnormalFraction;
 
     fn div(self, rhs: Self) -> Self::Output {
-        match self {
-            AbnormalFraction::Normal(f) => todo!(),
-            AbnormalFraction::Infinite => todo!(),
-            AbnormalFraction::NegInfinite => todo!(),
-            AbnormalFraction::NaN => todo!(),
+        match (&self, &rhs) {
+            (AbnormalFraction::Normal(f1), AbnormalFraction::Normal(f2)) if !f2.is_zero() => {
+                AbnormalFraction::Normal(f1 / f2)
+            }
+            (AbnormalFraction::Normal(_), AbnormalFraction::Normal(_)) => AbnormalFraction::NaN,
+            (AbnormalFraction::Normal(_), AbnormalFraction::Infinite) => {
+                AbnormalFraction::Normal(Fraction::zero())
+            }
+            (AbnormalFraction::Normal(_), AbnormalFraction::NegInfinite) => {
+                AbnormalFraction::Normal(Fraction::zero())
+            }
+
+            (AbnormalFraction::Infinite, AbnormalFraction::Normal(f)) if f.is_positive() => {
+                AbnormalFraction::Infinite
+            }
+            (AbnormalFraction::Infinite, AbnormalFraction::Normal(f)) if f.is_negative() => {
+                AbnormalFraction::NegInfinite
+            }
+            (AbnormalFraction::Infinite, AbnormalFraction::Normal(_)) => AbnormalFraction::NaN,
+
+            (AbnormalFraction::Infinite, AbnormalFraction::Infinite) => AbnormalFraction::NaN,
+            (AbnormalFraction::Infinite, AbnormalFraction::NegInfinite) => AbnormalFraction::NaN,
+
+            (AbnormalFraction::NegInfinite, AbnormalFraction::Normal(f)) if f.is_positive() => {
+                AbnormalFraction::NegInfinite
+            }
+            (AbnormalFraction::NegInfinite, AbnormalFraction::Normal(f)) if f.is_negative() => {
+                AbnormalFraction::Infinite
+            }
+            (AbnormalFraction::NegInfinite, AbnormalFraction::Normal(_)) => AbnormalFraction::NaN,
+
+            (AbnormalFraction::NegInfinite, AbnormalFraction::Infinite) => AbnormalFraction::NaN,
+            (AbnormalFraction::NegInfinite, AbnormalFraction::NegInfinite) => AbnormalFraction::NaN,
+            (_, AbnormalFraction::NaN) => AbnormalFraction::NaN,
+            (AbnormalFraction::NaN, _) => AbnormalFraction::NaN,
         }
     }
 }
 
 impl Sum for AbnormalFraction {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        todo!()
+        iter.fold(Self::zero(), |a, b| a + b)
     }
 }
 
 impl From<usize> for AbnormalFraction {
     fn from(value: usize) -> Self {
-        todo!()
+        Self::Normal(value.into())
     }
 }
 
 impl From<(usize, usize)> for AbnormalFraction {
     fn from(value: (usize, usize)) -> Self {
-        todo!()
+        Self::Normal(value.into())
     }
 }
 
