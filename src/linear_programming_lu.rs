@@ -1,11 +1,9 @@
-use ebi_arithmetic::{
-    ebi_number::{Normal, Signed, Zero},
-    f0,
-    fraction::Fraction,
-};
+use ebi_arithmetic::{Signed, Zero};
 use log::trace;
 
 use crate::{
+    abnormal_fraction::AbnormalFraction,
+    f0_ab,
     linear_programming_ordering::order_simple,
     linear_programming_sparse::{Error, Perm, ScatteredVec, SparseMat, TriangleMat},
 };
@@ -21,7 +19,7 @@ pub struct LUFactors {
 #[derive(Clone, Debug)]
 pub struct ScratchSpace {
     rhs: ScatteredVec,
-    dense_rhs: Vec<Fraction>,
+    dense_rhs: Vec<AbnormalFraction>,
     mark_nonzero: MarkNonzero,
 }
 
@@ -29,7 +27,7 @@ impl ScratchSpace {
     pub fn with_capacity(n: usize) -> ScratchSpace {
         ScratchSpace {
             rhs: ScatteredVec::empty(n),
-            dense_rhs: vec![f0!(); n],
+            dense_rhs: vec![f0_ab!(); n],
             mark_nonzero: MarkNonzero::with_capacity(n),
         }
     }
@@ -63,8 +61,8 @@ impl LUFactors {
         self.lower.nondiag.nnz() + self.upper.nondiag.nnz() + self.lower.cols()
     }
 
-    pub fn solve_dense(&self, rhs: &mut [Fraction], scratch: &mut ScratchSpace) {
-        scratch.dense_rhs.resize(rhs.len(), f0!());
+    pub fn solve_dense(&self, rhs: &mut [AbnormalFraction], scratch: &mut ScratchSpace) {
+        scratch.dense_rhs.resize(rhs.len(), f0_ab!());
 
         if let Some(row_perm) = &self.row_perm {
             for i in 0..rhs.len() {
@@ -127,8 +125,8 @@ impl LUFactors {
 
 pub fn lu_factorise<'a>(
     size: usize,
-    get_col: impl Fn(usize) -> (&'a [usize], &'a [Fraction]),
-    stability_coeff: Fraction,
+    get_col: impl Fn(usize) -> (&'a [usize], &'a [AbnormalFraction]),
+    stability_coeff: AbnormalFraction,
     scratch: &mut ScratchSpace,
 ) -> Result<LUFactors, Error> {
     // Implementation of the Gilbert-Peierls algorithm:
@@ -202,13 +200,13 @@ pub fn lu_factorise<'a>(
         // but bad for sparseness, so we do threshold pivoting instead.
 
         let pivot_orig_r = {
-            let mut max_abs = f0!();
+            let mut max_abs = f0_ab!();
             for &orig_r in &scratch.rhs.nonzero {
                 if orig2new_row[orig_r] < i_col {
                     continue;
                 }
 
-                let abs = Fraction::abs(&scratch.rhs.values[orig_r]);
+                let abs = AbnormalFraction::abs(scratch.rhs.values[orig_r].clone());
                 if abs > max_abs {
                     max_abs = abs;
                 }
@@ -217,8 +215,6 @@ pub fn lu_factorise<'a>(
             if max_abs.is_zero() {
                 return Err(Error::SingularMatrix);
             }
-
-            assert!(max_abs.is_normal());
 
             // Choose among eligible pivot rows one with the least elements.
             // Gilbert-Peierls suggest to choose row with least elements *to the right*,
@@ -231,7 +227,9 @@ pub fn lu_factorise<'a>(
                     continue;
                 }
 
-                if Fraction::abs(&scratch.rhs.values[orig_r]) >= &stability_coeff * &max_abs {
+                if AbnormalFraction::abs(scratch.rhs.values[orig_r].clone())
+                    >= &stability_coeff * &max_abs
+                {
                     let elt_count = orig_row2elt_count[orig_r];
                     if best_elt_count.is_none() || best_elt_count.unwrap() > elt_count {
                         best_orig_r = Some(orig_r);
@@ -421,7 +419,7 @@ enum Triangle {
     Upper,
 }
 
-fn tri_solve_dense(tri_mat: &TriangleMat, triangle: Triangle, rhs: &mut [Fraction]) {
+fn tri_solve_dense(tri_mat: &TriangleMat, triangle: Triangle, rhs: &mut [AbnormalFraction]) {
     assert_eq!(tri_mat.rows(), rhs.len());
     match triangle {
         Triangle::Lower => {
@@ -457,7 +455,7 @@ fn tri_solve_sparse(tri_mat: &TriangleMat, scratch: &mut ScratchSpace) {
     }
 }
 
-fn tri_solve_process_col(tri_mat: &TriangleMat, col: usize, rhs: &mut [Fraction]) {
+fn tri_solve_process_col(tri_mat: &TriangleMat, col: usize, rhs: &mut [AbnormalFraction]) {
     // all other variables in this row (multiplied by their coeffs)
     // are already subtracted from rhs[col].
     let x_val = if let Some(diag) = tri_mat.diag.as_ref() {
@@ -474,17 +472,20 @@ fn tri_solve_process_col(tri_mat: &TriangleMat, col: usize, rhs: &mut [Fraction]
 
 #[cfg(test)]
 mod tests {
-    use crate::linear_programming_helpers::{assert_matrix_eq, to_dense, to_sparse};
+    use crate::{
+        f_ab, f1_ab,
+        linear_programming_helpers::{assert_matrix_eq, to_dense, to_sparse},
+    };
 
     use super::*;
-    use ebi_arithmetic::{ebi_number::One, f, f1};
+    use ebi_arithmetic::One;
     use sprs::{CsMat, TriMat};
 
     fn mat_from_triplets(
         rows: usize,
         cols: usize,
-        triplets: &[(usize, usize, Fraction)],
-    ) -> CsMat<Fraction> {
+        triplets: &[(usize, usize, AbnormalFraction)],
+    ) -> CsMat<AbnormalFraction> {
         let mut mat = TriMat::with_capacity((rows, cols), triplets.len());
         for (r, c, val) in triplets {
             mat.add_triplet(*r, *c, val.clone());
@@ -498,15 +499,15 @@ mod tests {
             3,
             4,
             &[
-                (0, 1, f!(2)),
-                (0, 0, f!(2)),
-                (0, 2, f!(123)),
-                (1, 2, f!(456)),
-                (1, 3, f1!()),
-                (2, 1, f!(4)),
-                (2, 0, f!(3)),
-                (2, 2, f!(789)),
-                (2, 3, f1!()),
+                (0, 1, f_ab!(2)),
+                (0, 0, f_ab!(2)),
+                (0, 2, f_ab!(123)),
+                (1, 2, f_ab!(456)),
+                (1, 3, f1_ab!()),
+                (2, 1, f_ab!(4)),
+                (2, 0, f_ab!(3)),
+                (2, 2, f_ab!(789)),
+                (2, 3, f1_ab!()),
             ],
         );
 
@@ -514,26 +515,26 @@ mod tests {
         let lu = lu_factorise(
             mat.rows(),
             |c| mat.outer_view([1, 0, 3][c]).unwrap().into_raw_storage(),
-            f!(9, 10),
+            f_ab!(9, 10),
             &mut scratch,
         )
         .unwrap();
         let lu_transp = lu.transpose();
 
         let l_nondiag_ref = [
-            vec![f0!(), f0!(), f0!()],
-            vec![f!(5, 10), f0!(), f0!()],
-            vec![f0!(), f0!(), f0!()],
+            vec![f0_ab!(), f0_ab!(), f0_ab!()],
+            vec![f_ab!(5, 10), f0_ab!(), f0_ab!()],
+            vec![f0_ab!(), f0_ab!(), f0_ab!()],
         ];
         assert_matrix_eq(&lu.lower.nondiag.to_csmat(), &l_nondiag_ref);
         assert_eq!(lu.lower.diag, None);
 
         let u_nondiag_ref = [
-            vec![f0!(), f!(3), f1!()],
-            vec![f0!(), f0!(), -f!(5, 10)],
-            vec![f0!(), f0!(), f0!()],
+            vec![f0_ab!(), f_ab!(3), f1_ab!()],
+            vec![f0_ab!(), f0_ab!(), -f_ab!(5, 10)],
+            vec![f0_ab!(), f0_ab!(), f0_ab!()],
         ];
-        let u_diag_ref = [f!(4), f!(5, 10), f1!()];
+        let u_diag_ref = [f_ab!(4), f_ab!(5, 10), f1_ab!()];
         assert_matrix_eq(&lu.upper.nondiag.to_csmat(), &u_nondiag_ref);
         assert_eq!(lu.upper.diag.as_ref().unwrap(), &u_diag_ref);
 
@@ -541,29 +542,35 @@ mod tests {
         assert_eq!(lu.col_perm.as_ref().unwrap().new2orig, &[0, 1, 2]);
 
         {
-            let mut rhs_dense = [f!(6), f!(3), f!(13)];
+            let mut rhs_dense = [f_ab!(6), f_ab!(3), f_ab!(13)];
             lu.solve_dense(&mut rhs_dense, &mut scratch);
-            assert_eq!(&rhs_dense, &[f1!(), f!(2), f!(3)]);
+            assert_eq!(&rhs_dense, &[f1_ab!(), f_ab!(2), f_ab!(3)]);
         }
 
         {
-            let mut rhs_dense_t = [f!(14), f!(11), f!(5)];
+            let mut rhs_dense_t = [f_ab!(14), f_ab!(11), f_ab!(5)];
             lu_transp.solve_dense(&mut rhs_dense_t, &mut scratch);
-            assert_eq!(&rhs_dense_t, &[f1!(), f!(2), f!(3)]);
+            assert_eq!(&rhs_dense_t, &[f1_ab!(), f_ab!(2), f_ab!(3)]);
         }
 
         {
             let mut rhs = ScatteredVec::empty(3);
-            rhs.set(to_sparse(&[f0!(), -f1!(), f0!()]).iter());
+            rhs.set(to_sparse(&[f0_ab!(), -f1_ab!(), f0_ab!()]).iter());
             lu.solve(&mut rhs, &mut scratch);
-            assert_eq!(to_dense(&rhs.to_csvec()), vec![f1!(), -f1!(), -f1!()]);
+            assert_eq!(
+                to_dense(&rhs.to_csvec()),
+                vec![f1_ab!(), -f1_ab!(), -f1_ab!()]
+            );
         }
 
         {
             let mut rhs = ScatteredVec::empty(3);
-            rhs.set(to_sparse(&[f0!(), -f1!(), f1!()]).iter());
+            rhs.set(to_sparse(&[f0_ab!(), -f1_ab!(), f1_ab!()]).iter());
             lu_transp.solve(&mut rhs, &mut scratch);
-            assert_eq!(to_dense(&rhs.to_csvec()), vec![-f!(2), f0!(), f1!()]);
+            assert_eq!(
+                to_dense(&rhs.to_csvec()),
+                vec![-f_ab!(2), f0_ab!(), f1_ab!()]
+            );
         }
     }
 
@@ -575,7 +582,12 @@ mod tests {
             let symbolically_singular = mat_from_triplets(
                 size,
                 size,
-                &[(0, 0, f1!()), (1, 0, f1!()), (1, 1, f!(2)), (1, 2, f!(3))],
+                &[
+                    (0, 0, f1_ab!()),
+                    (1, 0, f1_ab!()),
+                    (1, 1, f_ab!(2)),
+                    (1, 2, f_ab!(3)),
+                ],
             );
 
             let mut scratch = ScratchSpace::with_capacity(size);
@@ -587,7 +599,7 @@ mod tests {
                         .unwrap()
                         .into_raw_storage()
                 },
-                f!(9, 10),
+                f_ab!(9, 10),
                 &mut scratch,
             );
             assert_eq!(err.unwrap_err(), Error::SingularMatrix);
@@ -598,13 +610,13 @@ mod tests {
                 size,
                 size,
                 &[
-                    (0, 0, f1!()),
-                    (1, 0, f1!()),
-                    (1, 1, f!(2)),
-                    (1, 2, f!(3)),
-                    (2, 0, f!(2)),
-                    (2, 1, f!(2)),
-                    (2, 2, f!(3)),
+                    (0, 0, f1_ab!()),
+                    (1, 0, f1_ab!()),
+                    (1, 1, f_ab!(2)),
+                    (1, 2, f_ab!(3)),
+                    (2, 0, f_ab!(2)),
+                    (2, 1, f_ab!(2)),
+                    (2, 2, f_ab!(3)),
                 ],
             );
 
@@ -617,7 +629,7 @@ mod tests {
                         .unwrap()
                         .into_raw_storage()
                 },
-                f!(9, 10),
+                f_ab!(9, 10),
                 &mut scratch,
             );
             assert_eq!(err.unwrap_err(), Error::SingularMatrix);

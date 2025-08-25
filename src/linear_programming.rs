@@ -73,7 +73,7 @@ impl Variable {
 #[derive(Clone, Debug)]
 pub struct LinearExpr {
     vars: Vec<usize>,
-    coeffs: Vec<Fraction>,
+    coeffs: Vec<AbnormalFraction>,
 }
 
 impl LinearExpr {
@@ -91,7 +91,7 @@ impl LinearExpr {
     /// several times is forbidden (the [`Problem::add_constraint`] method will panic).
     ///
     /// [`Problem::add_constraint`]: struct.Problem.html#method.add_constraint
-    pub fn add(&mut self, var: Variable, coeff: Fraction) {
+    pub fn add(&mut self, var: Variable, coeff: AbnormalFraction) {
         self.vars.push(var.0);
         self.coeffs.push(coeff);
     }
@@ -101,16 +101,16 @@ impl LinearExpr {
 /// This is an auxiliary struct for specifying conversions.
 #[doc(hidden)]
 #[derive(Clone, Debug)]
-pub struct LinearTerm(Variable, Fraction);
+pub struct LinearTerm(Variable, AbnormalFraction);
 
-impl From<(Variable, Fraction)> for LinearTerm {
-    fn from(term: (Variable, Fraction)) -> Self {
+impl From<(Variable, AbnormalFraction)> for LinearTerm {
+    fn from(term: (Variable, AbnormalFraction)) -> Self {
         LinearTerm(term.0, term.1)
     }
 }
 
-impl<'a> From<&'a (Variable, Fraction)> for LinearTerm {
-    fn from(term: &'a (Variable, Fraction)) -> Self {
+impl<'a> From<&'a (Variable, AbnormalFraction)> for LinearTerm {
+    fn from(term: &'a (Variable, AbnormalFraction)) -> Self {
         LinearTerm(term.0, term.1.clone())
     }
 }
@@ -126,8 +126,8 @@ impl<I: IntoIterator<Item = impl Into<LinearTerm>>> From<I> for LinearExpr {
     }
 }
 
-impl std::iter::FromIterator<(Variable, Fraction)> for LinearExpr {
-    fn from_iter<I: IntoIterator<Item = (Variable, Fraction)>>(iter: I) -> Self {
+impl std::iter::FromIterator<(Variable, AbnormalFraction)> for LinearExpr {
+    fn from_iter<I: IntoIterator<Item = (Variable, AbnormalFraction)>>(iter: I) -> Self {
         let mut expr = LinearExpr::empty();
         for term in iter {
             expr.add(term.0, term.1)
@@ -136,8 +136,8 @@ impl std::iter::FromIterator<(Variable, Fraction)> for LinearExpr {
     }
 }
 
-impl std::iter::Extend<(Variable, Fraction)> for LinearExpr {
-    fn extend<I: IntoIterator<Item = (Variable, Fraction)>>(&mut self, iter: I) {
+impl std::iter::Extend<(Variable, AbnormalFraction)> for LinearExpr {
+    fn extend<I: IntoIterator<Item = (Variable, AbnormalFraction)>>(&mut self, iter: I) {
         for term in iter {
             self.add(term.0, term.1)
         }
@@ -180,10 +180,10 @@ impl std::error::Error for Error {}
 #[derive(Clone)]
 pub struct Problem {
     direction: OptimisationDirection,
-    obj_coeffs: Vec<Fraction>,
-    var_mins: Vec<Fraction>,
-    var_maxs: Vec<Fraction>,
-    constraints: Vec<(CsVec, ComparisonOp, Fraction)>,
+    obj_coeffs: Vec<AbnormalFraction>,
+    var_mins: Vec<AbnormalFraction>,
+    var_maxs: Vec<AbnormalFraction>,
+    constraints: Vec<(CsVec, ComparisonOp, AbnormalFraction)>,
 }
 
 impl std::fmt::Debug for Problem {
@@ -197,7 +197,7 @@ impl std::fmt::Debug for Problem {
     }
 }
 
-pub(crate) type CsVec = sprs::CsVecI<Fraction, usize>;
+pub(crate) type CsVec = sprs::CsVecI<AbnormalFraction, usize>;
 
 impl Problem {
     /// Create a new problem instance.
@@ -217,7 +217,11 @@ impl Problem {
     /// variable, `min` and `max` are the minimum and maximum (inclusive) bounds of this
     /// variable. If one of the bounds is absent, use `Fraction::neg_infinity()` for minimum and
     /// `Fraction::infinity()` for maximum.
-    pub fn add_var(&mut self, obj_coeff: Fraction, (min, max): (Fraction, Fraction)) -> Variable {
+    pub fn add_var(
+        &mut self,
+        obj_coeff: AbnormalFraction,
+        (min, max): (AbnormalFraction, AbnormalFraction),
+    ) -> Variable {
         let var = Variable(self.obj_coeffs.len());
         let obj_coeff = match self.direction {
             OptimisationDirection::Minimise => obj_coeff,
@@ -242,8 +246,8 @@ impl Problem {
     /// # use ebi_optimisation::{*, linear_programming::*};
     /// # use ebi_arithmetic::{*,ebi_number::*,fraction::*};
     /// let mut problem = Problem::new(OptimisationDirection::Minimise);
-    /// let x = problem.add_var(f1!(), (f0!(), Fraction::infinity()));
-    /// let y = problem.add_var(f1!(), (f0!(), Fraction::infinity()));
+    /// let x = problem.add_var(f1!(), (f0!(), AbnormalFraction::infinity()));
+    /// let y = problem.add_var(f1!(), (f0!(), AbnormalFraction::infinity()));
     ///
     /// // Add an x + y >= 2 constraint, specifying the left-hand side expression:
     ///
@@ -265,7 +269,7 @@ impl Problem {
         &mut self,
         expr: impl Into<LinearExpr>,
         cmp_op: ComparisonOp,
-        rhs: Fraction,
+        rhs: AbnormalFraction,
     ) {
         let expr = expr.into();
         self.constraints.push((
@@ -324,7 +328,7 @@ impl std::fmt::Debug for Solution {
 
 impl Solution {
     /// Optimal value of the objective function.
-    pub fn objective(&self) -> Fraction {
+    pub fn objective(&self) -> AbnormalFraction {
         match self.direction {
             OptimisationDirection::Minimise => self.solver.cur_obj_val.clone(),
             OptimisationDirection::Maximise => -self.solver.cur_obj_val.clone(),
@@ -334,7 +338,7 @@ impl Solution {
     /// Value of the variable at optimum.
     ///
     /// Note that you can use indexing operations to get variable values.
-    pub fn var_value(&self, var: Variable) -> &Fraction {
+    pub fn var_value(&self, var: Variable) -> &AbnormalFraction {
         assert!(var.0 < self.num_vars);
         self.solver.get_value(var.0)
     }
@@ -362,7 +366,7 @@ impl Solution {
         mut self,
         expr: impl Into<LinearExpr>,
         cmp_op: ComparisonOp,
-        rhs: Fraction,
+        rhs: AbnormalFraction,
     ) -> Result<Self, Error> {
         let expr = expr.into();
         self.solver.add_constraint(
@@ -380,7 +384,7 @@ impl Solution {
     /// # Errors
     ///
     /// Will return an error if the problem becomes infeasible with the additional constraint.
-    pub fn fix_var(mut self, var: Variable, val: Fraction) -> Result<Self, Error> {
+    pub fn fix_var(mut self, var: Variable, val: AbnormalFraction) -> Result<Self, Error> {
         assert!(var.0 < self.num_vars);
         self.solver.fix_var(var.0, val)?;
         Ok(self)
@@ -417,7 +421,7 @@ impl Solution {
 }
 
 impl std::ops::Index<Variable> for Solution {
-    type Output = Fraction;
+    type Output = AbnormalFraction;
 
     fn index(&self, var: Variable) -> &Self::Output {
         self.var_value(var)
@@ -432,7 +436,7 @@ pub struct SolutionIter<'a> {
 }
 
 impl<'a> Iterator for SolutionIter<'a> {
-    type Item = (Variable, &'a Fraction);
+    type Item = (Variable, &'a AbnormalFraction);
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.var_idx < self.solution.num_vars {
@@ -446,7 +450,7 @@ impl<'a> Iterator for SolutionIter<'a> {
 }
 
 impl<'a> IntoIterator for &'a Solution {
-    type Item = (Variable, &'a Fraction);
+    type Item = (Variable, &'a AbnormalFraction);
     type IntoIter = SolutionIter<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -454,60 +458,66 @@ impl<'a> IntoIterator for &'a Solution {
     }
 }
 
-use ebi_arithmetic::fraction::Fraction;
-
-use crate::linear_programming_solver::Solver;
+use crate::{abnormal_fraction::AbnormalFraction, linear_programming_solver::Solver};
 
 #[cfg(test)]
 mod tests {
-    use ebi_arithmetic::{
-        ebi_number::{One, Signed, Zero},
-        f, f0, f1,
-    };
+
+    use ebi_arithmetic::{One, Signed, Zero};
+
+    use crate::{abnormal_fraction::AbnormalFraction, f_ab, f0_ab, f1_ab};
 
     use super::*;
 
     #[test]
     fn optimise() {
         let mut problem = Problem::new(OptimisationDirection::Maximise);
-        let v1 = problem.add_var(f!(3), (f!(12), Fraction::infinity()));
-        let v2 = problem.add_var(f!(4), (f!(5), Fraction::infinity()));
-        problem.add_constraint(&[(v1, f1!()), (v2, f1!())], ComparisonOp::Le, f!(20));
-        problem.add_constraint(&[(v1, f1!()), (v2, -f!(4))], ComparisonOp::Ge, -f!(20));
+        let v1 = problem.add_var(f_ab!(3), (f_ab!(12), AbnormalFraction::infinity()));
+        let v2 = problem.add_var(f_ab!(4), (f_ab!(5), AbnormalFraction::infinity()));
+        problem.add_constraint(
+            &[(v1, f1_ab!()), (v2, f1_ab!())],
+            ComparisonOp::Le,
+            f_ab!(20),
+        );
+        problem.add_constraint(
+            &[(v1, f1_ab!()), (v2, -f_ab!(4))],
+            ComparisonOp::Ge,
+            -f_ab!(20),
+        );
 
         let sol = problem.solve().unwrap();
-        assert_eq!(sol[v1], f!(12));
-        assert_eq!(sol[v2], f!(8));
-        assert_eq!(sol.objective(), f!(68));
+        assert_eq!(sol[v1], f_ab!(12));
+        assert_eq!(sol[v2], f_ab!(8));
+        assert_eq!(sol.objective(), f_ab!(68));
     }
 
     #[test]
     fn empty_expr_constraints() {
         let trivial = [
-            (LinearExpr::empty(), ComparisonOp::Eq, f0!()),
-            (LinearExpr::empty(), ComparisonOp::Ge, -f1!()),
-            (LinearExpr::empty(), ComparisonOp::Le, f1!()),
+            (LinearExpr::empty(), ComparisonOp::Eq, f0_ab!()),
+            (LinearExpr::empty(), ComparisonOp::Ge, -f1_ab!()),
+            (LinearExpr::empty(), ComparisonOp::Le, f1_ab!()),
         ];
 
         let mut problem = Problem::new(OptimisationDirection::Minimise);
-        let _ = problem.add_var(f1!(), (f0!(), Fraction::infinity()));
+        let _ = problem.add_var(f1_ab!(), (f0_ab!(), AbnormalFraction::infinity()));
         for (expr, op, b) in trivial.iter().cloned() {
             problem.add_constraint(expr, op, b);
         }
-        assert_eq!(problem.solve().map(|s| s.objective()), Ok(f0!()));
+        assert_eq!(problem.solve().map(|s| s.objective()), Ok(f0_ab!()));
 
         {
             let mut sol = problem.solve().unwrap();
             for (expr, op, b) in trivial.iter().cloned() {
                 sol = sol.add_constraint(expr, op, b).unwrap();
             }
-            assert_eq!(sol.objective(), f0!());
+            assert_eq!(sol.objective(), f0_ab!());
         }
 
         let infeasible = [
-            (LinearExpr::empty(), ComparisonOp::Eq, f!(12)),
-            (LinearExpr::empty(), ComparisonOp::Ge, f!(34)),
-            (LinearExpr::empty(), ComparisonOp::Le, -f!(56)),
+            (LinearExpr::empty(), ComparisonOp::Eq, f_ab!(12)),
+            (LinearExpr::empty(), ComparisonOp::Ge, f_ab!(34)),
+            (LinearExpr::empty(), ComparisonOp::Le, -f_ab!(56)),
         ];
 
         for (expr, op, b) in infeasible.iter().cloned() {
@@ -521,126 +531,180 @@ mod tests {
             assert_eq!(sol.map(|_| "solved"), Err(Error::Infeasible));
         }
 
-        let _ = problem.add_var(-f1!(), (f0!(), Fraction::infinity()));
+        let _ = problem.add_var(-f1_ab!(), (f0_ab!(), AbnormalFraction::infinity()));
         assert_eq!(problem.solve().map(|_| "solved"), Err(Error::Unbounded));
     }
 
     #[test]
     fn free_variables() {
         let mut problem = Problem::new(OptimisationDirection::Maximise);
-        let v1 = problem.add_var(f1!(), (f0!(), Fraction::infinity()));
-        let v2 = problem.add_var(f!(2), (Fraction::neg_infinity(), Fraction::infinity()));
-        problem.add_constraint(&[(v1, f1!()), (v2, f1!())], ComparisonOp::Le, f!(4));
-        problem.add_constraint(&[(v1, f1!()), (v2, f1!())], ComparisonOp::Ge, f!(2));
-        problem.add_constraint(&[(v1, f1!()), (v2, -f1!())], ComparisonOp::Ge, f0!());
+        let v1 = problem.add_var(f1_ab!(), (f0_ab!(), AbnormalFraction::infinity()));
+        let v2 = problem.add_var(
+            f_ab!(2),
+            (
+                AbnormalFraction::neg_infinity(),
+                AbnormalFraction::infinity(),
+            ),
+        );
+        problem.add_constraint(
+            &[(v1, f1_ab!()), (v2, f1_ab!())],
+            ComparisonOp::Le,
+            f_ab!(4),
+        );
+        problem.add_constraint(
+            &[(v1, f1_ab!()), (v2, f1_ab!())],
+            ComparisonOp::Ge,
+            f_ab!(2),
+        );
+        problem.add_constraint(
+            &[(v1, f1_ab!()), (v2, -f1_ab!())],
+            ComparisonOp::Ge,
+            f0_ab!(),
+        );
 
         let sol = problem.solve().unwrap();
-        assert_eq!(sol[v1], f!(2));
-        assert_eq!(sol[v2], f!(2));
-        assert_eq!(sol.objective(), f!(6));
+        assert_eq!(sol[v1], f_ab!(2));
+        assert_eq!(sol[v2], f_ab!(2));
+        assert_eq!(sol.objective(), f_ab!(6));
     }
 
     #[test]
     fn fix_unfix_var() {
         let mut problem = Problem::new(OptimisationDirection::Maximise);
-        let v1 = problem.add_var(f1!(), (f0!(), f!(3)));
-        let v2 = problem.add_var(f!(2), (f0!(), f!(3)));
-        problem.add_constraint(&[(v1, f1!()), (v2, f1!())], ComparisonOp::Le, f!(4));
-        problem.add_constraint(&[(v1, f1!()), (v2, f1!())], ComparisonOp::Ge, f1!());
+        let v1 = problem.add_var(f1_ab!(), (f0_ab!(), f_ab!(3)));
+        let v2 = problem.add_var(f_ab!(2), (f0_ab!(), f_ab!(3)));
+        problem.add_constraint(
+            &[(v1, f1_ab!()), (v2, f1_ab!())],
+            ComparisonOp::Le,
+            f_ab!(4),
+        );
+        problem.add_constraint(
+            &[(v1, f1_ab!()), (v2, f1_ab!())],
+            ComparisonOp::Ge,
+            f1_ab!(),
+        );
 
         let orig_sol = problem.solve().unwrap();
 
         {
-            let mut sol = orig_sol.clone().fix_var(v1, f!(1, 2)).unwrap();
-            assert_eq!(sol[v1], f!(1, 2));
-            assert_eq!(sol[v2], f!(3));
-            assert_eq!(sol.objective(), f!(65, 10));
+            let mut sol = orig_sol.clone().fix_var(v1, f_ab!(1, 2)).unwrap();
+            assert_eq!(sol[v1], f_ab!(1, 2));
+            assert_eq!(sol[v2], f_ab!(3));
+            assert_eq!(sol.objective(), f_ab!(65, 10));
 
             sol = sol.unfix_var(v1).0;
-            assert_eq!(sol[v1], f1!());
-            assert_eq!(sol[v2], f!(3));
-            assert_eq!(sol.objective(), f!(7));
+            assert_eq!(sol[v1], f1_ab!());
+            assert_eq!(sol[v2], f_ab!(3));
+            assert_eq!(sol.objective(), f_ab!(7));
         }
 
         {
-            let mut sol = orig_sol.clone().fix_var(v2, f!(25, 10)).unwrap();
-            assert_eq!(sol[v1], f!(15, 10));
-            assert_eq!(sol[v2], f!(25, 10));
-            assert_eq!(sol.objective(), f!(65, 10));
+            let mut sol = orig_sol.clone().fix_var(v2, f_ab!(25, 10)).unwrap();
+            assert_eq!(sol[v1], f_ab!(15, 10));
+            assert_eq!(sol[v2], f_ab!(25, 10));
+            assert_eq!(sol.objective(), f_ab!(65, 10));
 
             sol = sol.unfix_var(v2).0;
-            assert_eq!(sol[v1], f1!());
-            assert_eq!(sol[v2], f!(3));
-            assert_eq!(sol.objective(), f!(7));
+            assert_eq!(sol[v1], f1_ab!());
+            assert_eq!(sol[v2], f_ab!(3));
+            assert_eq!(sol.objective(), f_ab!(7));
         }
     }
 
     #[test]
     fn add_constraint() {
         let mut problem = Problem::new(OptimisationDirection::Minimise);
-        let v1 = problem.add_var(f!(2), (f0!(), Fraction::infinity()));
-        let v2 = problem.add_var(f1!(), (f0!(), Fraction::infinity()));
-        problem.add_constraint(&[(v1, f1!()), (v2, f1!())], ComparisonOp::Le, f!(4));
-        problem.add_constraint(&[(v1, f1!()), (v2, f1!())], ComparisonOp::Ge, f!(2));
+        let v1 = problem.add_var(f_ab!(2), (f0_ab!(), AbnormalFraction::infinity()));
+        let v2 = problem.add_var(f1_ab!(), (f0_ab!(), AbnormalFraction::infinity()));
+        problem.add_constraint(
+            &[(v1, f1_ab!()), (v2, f1_ab!())],
+            ComparisonOp::Le,
+            f_ab!(4),
+        );
+        problem.add_constraint(
+            &[(v1, f1_ab!()), (v2, f1_ab!())],
+            ComparisonOp::Ge,
+            f_ab!(2),
+        );
 
         let orig_sol = problem.solve().unwrap();
 
         {
             let sol = orig_sol
                 .clone()
-                .add_constraint(&[(v1, -f1!()), (v2, f1!())], ComparisonOp::Le, f0!())
+                .add_constraint(
+                    &[(v1, -f1_ab!()), (v2, f1_ab!())],
+                    ComparisonOp::Le,
+                    f0_ab!(),
+                )
                 .unwrap();
 
-            assert_eq!(sol[v1], f1!());
-            assert_eq!(sol[v2], f1!());
-            assert_eq!(sol.objective(), f!(3));
+            assert_eq!(sol[v1], f1_ab!());
+            assert_eq!(sol[v2], f1_ab!());
+            assert_eq!(sol.objective(), f_ab!(3));
         }
 
         {
             let sol = orig_sol
                 .clone()
-                .fix_var(v2, f!(15, 10))
+                .fix_var(v2, f_ab!(15, 10))
                 .unwrap()
-                .add_constraint(&[(v1, -f1!()), (v2, f1!())], ComparisonOp::Le, f0!())
+                .add_constraint(
+                    &[(v1, -f1_ab!()), (v2, f1_ab!())],
+                    ComparisonOp::Le,
+                    f0_ab!(),
+                )
                 .unwrap();
-            assert_eq!(sol[v1], f!(15, 10));
-            assert_eq!(sol[v2], f!(15, 10));
-            assert_eq!(sol.objective(), f!(45, 10));
+            assert_eq!(sol[v1], f_ab!(15, 10));
+            assert_eq!(sol[v2], f_ab!(15, 10));
+            assert_eq!(sol.objective(), f_ab!(45, 10));
         }
 
         {
             let sol = orig_sol
                 .clone()
-                .add_constraint(&[(v1, -f1!()), (v2, f1!())], ComparisonOp::Ge, f!(3))
+                .add_constraint(
+                    &[(v1, -f1_ab!()), (v2, f1_ab!())],
+                    ComparisonOp::Ge,
+                    f_ab!(3),
+                )
                 .unwrap();
 
-            assert_eq!(sol[v1], f0!());
-            assert_eq!(sol[v2], f!(3));
-            assert_eq!(sol.objective(), f!(3));
+            assert_eq!(sol[v1], f0_ab!());
+            assert_eq!(sol[v2], f_ab!(3));
+            assert_eq!(sol.objective(), f_ab!(3));
         }
     }
 
     #[test]
     fn gomory_cut() {
         let mut problem = Problem::new(OptimisationDirection::Minimise);
-        let v1 = problem.add_var(f0!(), (f0!(), Fraction::infinity()));
-        let v2 = problem.add_var(-f1!(), (f0!(), Fraction::infinity()));
-        problem.add_constraint(&[(v1, f!(3)), (v2, f!(2))], ComparisonOp::Le, f!(6));
-        problem.add_constraint(&[(v1, -f!(3)), (v2, f!(2))], ComparisonOp::Le, f0!());
+        let v1 = problem.add_var(f0_ab!(), (f0_ab!(), AbnormalFraction::infinity()));
+        let v2 = problem.add_var(-f1_ab!(), (f0_ab!(), AbnormalFraction::infinity()));
+        problem.add_constraint(
+            &[(v1, f_ab!(3)), (v2, f_ab!(2))],
+            ComparisonOp::Le,
+            f_ab!(6),
+        );
+        problem.add_constraint(
+            &[(v1, -f_ab!(3)), (v2, f_ab!(2))],
+            ComparisonOp::Le,
+            f0_ab!(),
+        );
 
         let mut sol = problem.solve().unwrap();
-        assert_eq!(sol[v1], f1!());
-        assert_eq!(sol[v2], f!(15, 10));
-        assert_eq!(sol.objective(), -f!(15, 10));
+        assert_eq!(sol[v1], f1_ab!());
+        assert_eq!(sol[v2], f_ab!(15, 10));
+        assert_eq!(sol.objective(), -f_ab!(15, 10));
 
         sol = sol.add_gomory_cut(v2).unwrap();
-        assert!(Fraction::abs(&(&sol[v1] - &f!(2, 3))) < f!(1, 1000000000));
-        assert_eq!(sol[v2], f1!());
-        assert_eq!(sol.objective(), -f1!());
+        assert!(AbnormalFraction::abs(&sol[v1] - &f_ab!(2, 3)) < f_ab!(1, 1000000000));
+        assert_eq!(sol[v2], f1_ab!());
+        assert_eq!(sol.objective(), -f1_ab!());
 
         sol = sol.add_gomory_cut(v1).unwrap();
-        assert!(Fraction::abs(&(&sol[v1] - &f1!())) < f!(1, 1000000000));
-        assert_eq!(sol[v2], f1!());
-        assert_eq!(sol.objective(), -f1!());
+        assert!(AbnormalFraction::abs(&sol[v1] - &f1_ab!()) < f_ab!(1, 1000000000));
+        assert_eq!(sol[v2], f1_ab!());
+        assert_eq!(sol.objective(), -f1_ab!());
     }
 }

@@ -1,0 +1,444 @@
+use std::{
+    cmp::Ordering,
+    fmt::Display,
+    iter::Sum,
+    ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign},
+};
+
+use anyhow::anyhow;
+use ebi_arithmetic::{Fraction, MaybeExact, One, Round, Signed, Zero};
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum AbnormalFraction {
+    Normal(Fraction),
+    Infinite,
+    NegInfinite,
+    NaN,
+}
+
+impl AbnormalFraction {
+    pub fn infinity() -> Self {
+        Self::Infinite
+    }
+
+    pub fn neg_infinity() -> Self {
+        Self::NegInfinite
+    }
+
+    /// Returns false if this value is positive infinity or negative infinity, and true otherwise.
+    pub fn is_finite(&self) -> bool {
+        match self {
+            AbnormalFraction::Normal(_) => true,
+            AbnormalFraction::Infinite | AbnormalFraction::NegInfinite => false,
+            AbnormalFraction::NaN => true,
+        }
+    }
+
+    /// Returns true if this value is positive infinity or negative infinity, and false otherwise.
+    pub fn is_infinite(&self) -> bool {
+        match self {
+            AbnormalFraction::Normal(_) => false,
+            AbnormalFraction::Infinite | AbnormalFraction::NegInfinite => true,
+            AbnormalFraction::NaN => false,
+        }
+    }
+
+    pub fn is_neg_infinite(&self) -> bool {
+        match self {
+            AbnormalFraction::Normal(_) | AbnormalFraction::Infinite | AbnormalFraction::NaN => {
+                false
+            }
+            AbnormalFraction::NegInfinite => true,
+        }
+    }
+}
+
+impl Display for AbnormalFraction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AbnormalFraction::Normal(fr) => fr.fmt(f),
+            AbnormalFraction::Infinite => write!(f, "∞"),
+            AbnormalFraction::NegInfinite => write!(f, "-∞"),
+            AbnormalFraction::NaN => write!(f, "NaN"),
+        }
+    }
+}
+
+impl Signed for AbnormalFraction {
+    fn abs(self) -> Self {
+        match self {
+            AbnormalFraction::Normal(f) => AbnormalFraction::Normal(f.abs()),
+            AbnormalFraction::Infinite => Self::NegInfinite,
+            AbnormalFraction::NegInfinite => Self::Infinite,
+            AbnormalFraction::NaN => Self::NaN,
+        }
+    }
+
+    fn is_positive(&self) -> bool {
+        match self {
+            AbnormalFraction::Normal(f) => f.is_positive(),
+            AbnormalFraction::Infinite => true,
+            AbnormalFraction::NegInfinite => false,
+            AbnormalFraction::NaN => false,
+        }
+    }
+
+    fn is_negative(&self) -> bool {
+        match self {
+            AbnormalFraction::Normal(f) => f.is_negative(),
+            AbnormalFraction::Infinite => false,
+            AbnormalFraction::NegInfinite => true,
+            AbnormalFraction::NaN => false,
+        }
+    }
+}
+
+impl Default for AbnormalFraction {
+    fn default() -> Self {
+        Self::Normal(Fraction::zero())
+    }
+}
+
+impl Zero for AbnormalFraction {
+    fn zero() -> Self {
+        Self::Normal(Fraction::zero())
+    }
+
+    fn is_zero(&self) -> bool {
+        match self {
+            AbnormalFraction::Normal(f) => f.is_zero(),
+            AbnormalFraction::Infinite | AbnormalFraction::NegInfinite | AbnormalFraction::NaN => {
+                false
+            }
+        }
+    }
+}
+
+impl num_traits::identities::Zero for AbnormalFraction {
+    fn zero() -> Self {
+        Self::Normal(Fraction::zero())
+    }
+
+    fn is_zero(&self) -> bool {
+        match self {
+            AbnormalFraction::Normal(f) => f.is_zero(),
+            AbnormalFraction::Infinite | AbnormalFraction::NegInfinite | AbnormalFraction::NaN => {
+                false
+            }
+        }
+    }
+}
+
+impl One for AbnormalFraction {
+    fn one() -> Self {
+        Self::Normal(Fraction::one())
+    }
+
+    fn is_one(&self) -> bool {
+        match self {
+            AbnormalFraction::Normal(f) => f.is_one(),
+            AbnormalFraction::Infinite | AbnormalFraction::NegInfinite | AbnormalFraction::NaN => {
+                false
+            }
+        }
+    }
+}
+
+impl MaybeExact for AbnormalFraction {
+    type Approximate = f64;
+    type Exact = Rational;
+
+    fn is_exact(&self) -> bool {
+        match self {
+            AbnormalFraction::Normal(f) => f.is_exact(),
+            AbnormalFraction::Infinite => true,
+            AbnormalFraction::NegInfinite => true,
+            AbnormalFraction::NaN => true,
+        }
+    }
+
+    fn extract_approx(&self) -> anyhow::Result<&Self::Approximate> {
+        match self {
+            AbnormalFraction::Normal(f) => f.extract_approx(),
+            AbnormalFraction::Infinite | AbnormalFraction::NegInfinite | AbnormalFraction::NaN => {
+                Err(anyhow!("cannot extract an approximate value"))
+            }
+        }
+    }
+
+    fn extract_exact(&self) -> anyhow::Result<&Self::Exact> {
+        match self {
+            AbnormalFraction::Normal(f) => f.extract_exact(),
+            AbnormalFraction::Infinite | AbnormalFraction::NegInfinite | AbnormalFraction::NaN => {
+                Err(anyhow!("cannot extract an exact value"))
+            }
+        }
+    }
+}
+
+impl PartialOrd for AbnormalFraction {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match (self, other) {
+            (AbnormalFraction::Normal(f1), AbnormalFraction::Normal(f2)) => f1.partial_cmp(f2),
+            (AbnormalFraction::Normal(_), AbnormalFraction::Infinite) => Some(Ordering::Less),
+            (AbnormalFraction::Normal(_), AbnormalFraction::NegInfinite) => Some(Ordering::Greater),
+            (AbnormalFraction::Infinite, AbnormalFraction::Normal(_)) => Some(Ordering::Greater),
+            (AbnormalFraction::Infinite, AbnormalFraction::Infinite) => None,
+            (AbnormalFraction::Infinite, AbnormalFraction::NegInfinite) => Some(Ordering::Greater),
+            (AbnormalFraction::NegInfinite, AbnormalFraction::Normal(_)) => Some(Ordering::Less),
+            (AbnormalFraction::NegInfinite, AbnormalFraction::Infinite) => Some(Ordering::Less),
+            (AbnormalFraction::NegInfinite, AbnormalFraction::NegInfinite) => None,
+            (_, AbnormalFraction::NaN) => None,
+            (AbnormalFraction::NaN, _) => None,
+        }
+    }
+}
+
+impl Round for AbnormalFraction {
+    fn floor(self) -> Self {
+        match self {
+            AbnormalFraction::Normal(f) => Self::Normal(f.floor()),
+            AbnormalFraction::Infinite => Self::Infinite,
+            AbnormalFraction::NegInfinite => Self::NegInfinite,
+            AbnormalFraction::NaN => Self::NaN,
+        }
+    }
+
+    fn ceil(self) -> Self {
+        match self {
+            AbnormalFraction::Normal(f) => Self::Normal(f.ceil()),
+            AbnormalFraction::Infinite => Self::Infinite,
+            AbnormalFraction::NegInfinite => Self::NegInfinite,
+            AbnormalFraction::NaN => Self::NaN,
+        }
+    }
+}
+
+impl Neg for AbnormalFraction {
+    type Output = AbnormalFraction;
+
+    fn neg(self) -> Self::Output {
+        match self {
+            AbnormalFraction::Normal(f) => Self::Normal(-f),
+            AbnormalFraction::Infinite => Self::NegInfinite,
+            AbnormalFraction::NegInfinite => Self::Infinite,
+            AbnormalFraction::NaN => Self::NaN,
+        }
+    }
+}
+
+impl Neg for &AbnormalFraction {
+    type Output = AbnormalFraction;
+
+    fn neg(self) -> Self::Output {
+        match self {
+            AbnormalFraction::Normal(f) => AbnormalFraction::Normal(-f),
+            AbnormalFraction::Infinite => AbnormalFraction::NegInfinite,
+            AbnormalFraction::NegInfinite => AbnormalFraction::Infinite,
+            AbnormalFraction::NaN => AbnormalFraction::NaN,
+        }
+    }
+}
+
+impl Add for AbnormalFraction {
+    type Output = AbnormalFraction;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (AbnormalFraction::Normal(f1), AbnormalFraction::Normal(f2)) => Self::Normal(f1 + f2),
+            (AbnormalFraction::Normal(_), AbnormalFraction::Infinite) => AbnormalFraction::Infinite,
+            (AbnormalFraction::Normal(_), AbnormalFraction::NegInfinite) => {
+                AbnormalFraction::NegInfinite
+            }
+            (AbnormalFraction::Infinite, AbnormalFraction::Normal(_)) => AbnormalFraction::Infinite,
+            (AbnormalFraction::Infinite, AbnormalFraction::Infinite) => AbnormalFraction::Infinite,
+            (AbnormalFraction::Infinite, AbnormalFraction::NegInfinite) => AbnormalFraction::NaN,
+            (AbnormalFraction::NegInfinite, AbnormalFraction::Normal(_)) => {
+                AbnormalFraction::NegInfinite
+            }
+            (AbnormalFraction::NegInfinite, AbnormalFraction::Infinite) => AbnormalFraction::NaN,
+            (AbnormalFraction::NegInfinite, AbnormalFraction::NegInfinite) => {
+                AbnormalFraction::NegInfinite
+            }
+            (_, AbnormalFraction::NaN) => AbnormalFraction::NaN,
+            (AbnormalFraction::NaN, _) => AbnormalFraction::NaN,
+        }
+    }
+}
+
+impl Add for &AbnormalFraction {
+    type Output = AbnormalFraction;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (AbnormalFraction::Normal(f1), AbnormalFraction::Normal(f2)) => AbnormalFraction::Normal(f1 + f2),
+            (AbnormalFraction::Normal(_), AbnormalFraction::Infinite) => AbnormalFraction::Infinite,
+            (AbnormalFraction::Normal(_), AbnormalFraction::NegInfinite) => {
+                AbnormalFraction::NegInfinite
+            }
+            (AbnormalFraction::Infinite, AbnormalFraction::Normal(_)) => AbnormalFraction::Infinite,
+            (AbnormalFraction::Infinite, AbnormalFraction::Infinite) => AbnormalFraction::Infinite,
+            (AbnormalFraction::Infinite, AbnormalFraction::NegInfinite) => AbnormalFraction::NaN,
+            (AbnormalFraction::NegInfinite, AbnormalFraction::Normal(_)) => {
+                AbnormalFraction::NegInfinite
+            }
+            (AbnormalFraction::NegInfinite, AbnormalFraction::Infinite) => AbnormalFraction::NaN,
+            (AbnormalFraction::NegInfinite, AbnormalFraction::NegInfinite) => {
+                AbnormalFraction::NegInfinite
+            }
+            (_, AbnormalFraction::NaN) => AbnormalFraction::NaN,
+            (AbnormalFraction::NaN, _) => AbnormalFraction::NaN,
+        }
+    }
+}
+
+impl AddAssign for AbnormalFraction {
+    fn add_assign(&mut self, rhs: Self) {
+        match self {
+            AbnormalFraction::Normal(f) => todo!(),
+            AbnormalFraction::Infinite => todo!(),
+            AbnormalFraction::NegInfinite => todo!(),
+            AbnormalFraction::NaN => todo!(),
+        }
+    }
+}
+
+impl Sub for AbnormalFraction {
+    type Output = AbnormalFraction;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        match self {
+            AbnormalFraction::Normal(f) => todo!(),
+            AbnormalFraction::Infinite => todo!(),
+            AbnormalFraction::NegInfinite => todo!(),
+            AbnormalFraction::NaN => todo!(),
+        }
+    }
+}
+
+impl Sub for &AbnormalFraction {
+    type Output = AbnormalFraction;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        match self {
+            AbnormalFraction::Normal(f) => todo!(),
+            AbnormalFraction::Infinite => todo!(),
+            AbnormalFraction::NegInfinite => todo!(),
+            AbnormalFraction::NaN => todo!(),
+        }
+    }
+}
+
+impl SubAssign for AbnormalFraction {
+    fn sub_assign(&mut self, rhs: Self) {
+        match self {
+            AbnormalFraction::Normal(f) => todo!(),
+            AbnormalFraction::Infinite => todo!(),
+            AbnormalFraction::NegInfinite => todo!(),
+            AbnormalFraction::NaN => todo!(),
+        }
+    }
+}
+
+impl Mul for AbnormalFraction {
+    type Output = AbnormalFraction;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        match self {
+            AbnormalFraction::Normal(f) => todo!(),
+            AbnormalFraction::Infinite => todo!(),
+            AbnormalFraction::NegInfinite => todo!(),
+            AbnormalFraction::NaN => todo!(),
+        }
+    }
+}
+
+impl Mul for &AbnormalFraction {
+    type Output = AbnormalFraction;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        match self {
+            AbnormalFraction::Normal(f) => todo!(),
+            AbnormalFraction::Infinite => todo!(),
+            AbnormalFraction::NegInfinite => todo!(),
+            AbnormalFraction::NaN => todo!(),
+        }
+    }
+}
+
+impl Div for AbnormalFraction {
+    type Output = AbnormalFraction;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        match self {
+            AbnormalFraction::Normal(f) => todo!(),
+            AbnormalFraction::Infinite => todo!(),
+            AbnormalFraction::NegInfinite => todo!(),
+            AbnormalFraction::NaN => todo!(),
+        }
+    }
+}
+
+impl Div for &AbnormalFraction {
+    type Output = AbnormalFraction;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        match self {
+            AbnormalFraction::Normal(f) => todo!(),
+            AbnormalFraction::Infinite => todo!(),
+            AbnormalFraction::NegInfinite => todo!(),
+            AbnormalFraction::NaN => todo!(),
+        }
+    }
+}
+
+impl Sum for AbnormalFraction {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        todo!()
+    }
+}
+
+impl From<usize> for AbnormalFraction {
+    fn from(value: usize) -> Self {
+        todo!()
+    }
+}
+
+impl From<(usize, usize)> for AbnormalFraction {
+    fn from(value: (usize, usize)) -> Self {
+        todo!()
+    }
+}
+
+#[macro_export]
+/// Convenience short-hand macro to create fractions.
+macro_rules! f_ab {
+    ($e: expr) => {
+        AbnormalFraction::from($e)
+    };
+
+    ($e: expr, $f: expr) => {
+        AbnormalFraction::from(($e, $f))
+    };
+}
+pub use f_ab;
+
+#[macro_export]
+/// Convenience short-hand macro to create a fraction representing zero.
+macro_rules! f0_ab {
+    () => {
+        AbnormalFraction::zero()
+    };
+}
+pub use f0_ab;
+
+#[macro_export]
+/// Convenience short-hand macro to create a fraction representing one.
+macro_rules! f1_ab {
+    () => {
+        AbnormalFraction::one()
+    };
+}
+pub use f1_ab;
+use malachite::rational::Rational;
+use pathfinding::num_traits;

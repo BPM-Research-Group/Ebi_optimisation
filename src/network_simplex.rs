@@ -1,12 +1,12 @@
 use super::network_simplex_value_type::{MulWithFloat, ToBigInt};
 use core::convert::From;
 use ebi_arithmetic::exact::MaybeExact;
-use ebi_arithmetic::ebi_number::{One, Signed, Zero};
-use fraction::BigInt;
+use ebi_arithmetic::{One, Signed, Zero};
+use malachite::Integer;
 use rand::{seq::SliceRandom, thread_rng};
 use rayon::ThreadPool;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::{
     cmp::{PartialEq, PartialOrd},
     fmt::{Debug, Display},
@@ -590,9 +590,9 @@ where
             if count == 0 {
                 if !T::is_exact(&min_cost) {
                     // Floating-point specific logic
-                    let source_value = self.pi[self.source[self.in_arc]].abs();
-                    let target_value = self.pi[self.target[self.in_arc]].abs();
-                    let cost_value = self.cost[self.in_arc].abs();
+                    let source_value = self.pi[self.source[self.in_arc]].clone().abs();
+                    let target_value = self.pi[self.target[self.in_arc]].clone().abs();
+                    let cost_value = self.cost[self.in_arc].clone().abs();
 
                     let mut a = if source_value > target_value {
                         source_value
@@ -650,9 +650,9 @@ where
             if count == 0 {
                 if !T::is_exact(&min_cost) {
                     // Floating-point specific logic
-                    let source_value = self.pi[self.source[self.in_arc]].abs();
-                    let target_value = self.pi[self.target[self.in_arc]].abs();
-                    let cost_value = self.cost[self.in_arc].abs();
+                    let source_value = self.pi[self.source[self.in_arc]].clone().abs();
+                    let target_value = self.pi[self.target[self.in_arc]].clone().abs();
+                    let cost_value = self.cost[self.in_arc].clone().abs();
 
                     let mut a = if source_value > target_value {
                         source_value
@@ -681,9 +681,9 @@ where
 
         if !T::is_exact(&min_cost) {
             // Floating-point specific logic
-            let source_value = self.pi[self.source[self.in_arc]].abs();
-            let target_value = self.pi[self.target[self.in_arc]].abs();
-            let cost_value = self.cost[self.in_arc].abs();
+            let source_value = self.pi[self.source[self.in_arc]].clone().abs();
+            let target_value = self.pi[self.target[self.in_arc]].clone().abs();
+            let cost_value = self.cost[self.in_arc].clone().abs();
 
             let mut a = if source_value > target_value {
                 source_value
@@ -790,9 +790,9 @@ where
 
         // Check if a valid arc was found
         let valid_arc_found = if !T::is_exact(&final_min_cost) {
-            let source_value = self.pi[self.source[self.in_arc]].abs();
-            let target_value = self.pi[self.target[self.in_arc]].abs();
-            let cost_value = self.cost[self.in_arc].abs();
+            let source_value = self.pi[self.source[self.in_arc]].clone().abs();
+            let target_value = self.pi[self.target[self.in_arc]].clone().abs();
+            let cost_value = self.cost[self.in_arc].clone().abs();
 
             let mut a = if source_value > target_value {
                 source_value
@@ -1349,11 +1349,11 @@ where
         return None;
     }
 
-    pub fn get_bigint_result(&self) -> Option<BigInt> {
+    pub fn get_bigint_result(&self) -> Option<Integer> {
         if let Some(problem_type) = &self.problem_type {
             if problem_type == &ProblemType::Optimal {
                 let flow_cost = self.flow.iter().zip(self.cost.iter());
-                let mut result = BigInt::zero();
+                let mut result = Integer::zero();
                 for (flow, cost) in flow_cost {
                     let mut arc_result = flow.to_big_int();
                     arc_result *= cost.to_big_int();
@@ -1403,9 +1403,10 @@ where
 
 #[cfg(test)]
 mod tests {
+    use malachite::Integer;
+
     use crate::network_simplex::NetworkSimplex;
 
-    
     #[test]
     fn network_simplex_int() {
         let supply: Vec<i64> = vec![20, 0, 0, -5, -14];
@@ -1424,14 +1425,9 @@ mod tests {
 
     #[test]
     fn network_simplex_bigint() {
-        use num::BigInt;
+        let supply: Vec<Integer> = vec![20.into(), 0.into(), 0.into(), (-5).into(), (-14).into()];
 
-        let supply: Vec<BigInt> = vec![20, 0, 0, -5, -14]
-            .into_iter()
-            .map(|s| BigInt::from(s))
-            .collect();
-
-        let graph_and_costs: Vec<Vec<Option<BigInt>>> = vec![
+        let graph_and_costs: Vec<Vec<Option<Integer>>> = vec![
             vec![None, Some(4), Some(4), None, None],
             vec![None, None, Some(2), Some(2), Some(6)],
             vec![None, None, None, Some(1), Some(3)],
@@ -1441,14 +1437,14 @@ mod tests {
         .into_iter()
         .map(|row| {
             row.into_iter()
-                .map(|x| x.map(|cost| BigInt::from(cost)))
+                .map(|x| x.map(|cost| Integer::from(cost)))
                 .collect()
         })
         .collect();
 
         let mut ns = NetworkSimplex::new(&graph_and_costs, &supply, true, false);
         _ = ns.run(false);
-        assert_eq!(ns.get_result().unwrap(), BigInt::from(123));
+        assert_eq!(ns.get_result().unwrap(), Integer::from(123));
     }
 
     #[test]

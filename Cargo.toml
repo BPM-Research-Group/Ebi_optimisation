@@ -23,19 +23,19 @@ approximatearithmetic = [ "eapproximatearithmetic", "ebi_arithmetic/approximatea
 eapproximatearithmetic = []
 
 [dependencies]
-ebi_arithmetic = "0.1.10"
-anyhow = "1.0.98"
+ebi_arithmetic = "0.2.4"
+anyhow = "1.0.99"
 ndarray = "0.16.1"
 sprs = "0.11.3"
-indexmap = "2.10.0"
+indexmap = "2.11.0"
 rustc-hash = "2.1.1"
 log = "0.4.27"
 fraction = { version = "0.15.3", features = ["with-approx"] }
-rayon = "1.10.0"
+rayon = "1.11.0"
 rand = "0.8.5"
 parking_lot = "0.12.4"
-num = "0.4.3"
 pathfinding = "4.14.0"
+malachite = "*"
 
 [profile.release]
 debug = false

@@ -1,30 +1,28 @@
-use ebi_arithmetic::{
-    ebi_number::{Infinite, One, Round, Signed, Zero},
-    f, f0, f1,
-    fraction::Fraction,
-};
+use ebi_arithmetic::{One, Round, Signed, Zero};
 use log::debug;
 use sprs::CompressedStorage;
 
 use crate::{
+    abnormal_fraction::AbnormalFraction,
+    f_ab, f0_ab, f1_ab,
     linear_programming::{ComparisonOp, CsVec, Error},
     linear_programming_helpers::{resized_view, to_dense},
     linear_programming_lu::{LUFactors, ScratchSpace, lu_factorise},
     linear_programming_sparse::{ScatteredVec, SparseMat, SparseVec},
 };
 
-type CsMat = sprs::CsMatI<Fraction, usize>;
+type CsMat = sprs::CsMatI<AbnormalFraction, usize>;
 
 #[derive(Clone)]
 pub(crate) struct Solver {
     pub(crate) num_vars: usize,
 
-    orig_obj_coeffs: Vec<Fraction>,
-    orig_var_mins: Vec<Fraction>,
-    orig_var_maxs: Vec<Fraction>,
+    orig_obj_coeffs: Vec<AbnormalFraction>,
+    orig_var_mins: Vec<AbnormalFraction>,
+    orig_var_maxs: Vec<AbnormalFraction>,
     orig_constraints: CsMat, // excluding rhs
     orig_constraints_csc: CsMat,
-    orig_rhs: Vec<Fraction>,
+    orig_rhs: Vec<AbnormalFraction>,
 
     enable_primal_steepest_edge: bool,
     enable_dual_steepest_edge: bool,
@@ -39,24 +37,24 @@ pub(crate) struct Solver {
 
     /// For each constraint the corresponding basic var.
     basic_vars: Vec<usize>,
-    basic_var_vals: Vec<Fraction>,
-    basic_var_mins: Vec<Fraction>,
-    basic_var_maxs: Vec<Fraction>,
-    dual_edge_sq_norms: Vec<Fraction>,
+    basic_var_vals: Vec<AbnormalFraction>,
+    basic_var_mins: Vec<AbnormalFraction>,
+    basic_var_maxs: Vec<AbnormalFraction>,
+    dual_edge_sq_norms: Vec<AbnormalFraction>,
 
     /// Remaining variables. (idx -> var), 'nb' means 'non-basic'
     nb_vars: Vec<usize>,
-    nb_var_obj_coeffs: Vec<Fraction>,
-    nb_var_vals: Vec<Fraction>,
+    nb_var_obj_coeffs: Vec<AbnormalFraction>,
+    nb_var_vals: Vec<AbnormalFraction>,
     nb_var_states: Vec<NonBasicVarState>,
     nb_var_is_fixed: Vec<bool>,
-    primal_edge_sq_norms: Vec<Fraction>,
+    primal_edge_sq_norms: Vec<AbnormalFraction>,
 
-    pub(crate) cur_obj_val: Fraction,
+    pub(crate) cur_obj_val: AbnormalFraction,
 
     // Recomputed on each pivot
     col_coeffs: SparseVec,
-    sq_norms_update_helper: Vec<Fraction>,
+    sq_norms_update_helper: Vec<AbnormalFraction>,
     inv_basis_row_coeffs: SparseVec,
     row_coeffs: ScatteredVec,
 }
@@ -110,10 +108,10 @@ impl std::fmt::Debug for Solver {
 
 impl Solver {
     pub(crate) fn try_new(
-        obj_coeffs: &[Fraction],
-        var_mins: &[Fraction],
-        var_maxs: &[Fraction],
-        constraints: &[(CsVec, ComparisonOp, Fraction)],
+        obj_coeffs: &[AbnormalFraction],
+        var_mins: &[AbnormalFraction],
+        var_maxs: &[AbnormalFraction],
+        constraints: &[(CsVec, ComparisonOp, AbnormalFraction)],
     ) -> Result<Self, Error> {
         let enable_steepest_edge = true; // TODO: make user-settable.
 
@@ -130,7 +128,7 @@ impl Solver {
         let mut nb_var_vals = vec![];
         let mut nb_var_states = vec![];
 
-        let mut obj_val = f0!();
+        let mut obj_val = f0_ab!();
 
         let mut is_dual_feasible = true;
 
@@ -156,7 +154,7 @@ impl Solver {
                 if !obj_coeffs[v].is_zero() {
                     is_dual_feasible = false;
                 }
-                f0!()
+                f0_ab!()
             } else if obj_coeffs[v].is_positive() {
                 // We need a finite value and prefer min for dual feasibility.
                 if min.is_finite() {
@@ -223,9 +221,9 @@ impl Solver {
             orig_rhs.push(rhs.clone());
 
             let (slack_var_min, slack_var_max) = match cmp_op {
-                ComparisonOp::Le => (f0!(), Fraction::infinity()),
-                ComparisonOp::Ge => (Fraction::neg_infinity(), f0!()),
-                ComparisonOp::Eq => (f0!(), f0!()),
+                ComparisonOp::Le => (f0_ab!(), AbnormalFraction::infinity()),
+                ComparisonOp::Ge => (AbnormalFraction::neg_infinity(), f0_ab!()),
+                ComparisonOp::Eq => (f0_ab!(), f0_ab!()),
             };
 
             orig_var_mins.push(slack_var_min.clone());
@@ -238,7 +236,7 @@ impl Solver {
             var_states.push(VarState::Basic(basic_vars.len()));
             basic_vars.push(cur_slack_var);
 
-            let mut lhs_val = f0!();
+            let mut lhs_val = f0_ab!();
             for (var, coeff) in coeffs.iter() {
                 lhs_val += coeff * &nb_var_vals[var];
             }
@@ -249,12 +247,12 @@ impl Solver {
         let num_total_vars = num_vars + num_constraints;
 
         let mut orig_obj_coeffs = obj_coeffs.to_vec();
-        orig_obj_coeffs.resize(num_total_vars, f0!());
+        orig_obj_coeffs.resize(num_total_vars, f0_ab!());
 
         let mut orig_constraints = CsMat::empty(CompressedStorage::CSR, num_total_vars);
         for (cur_slack_var, coeffs) in constraint_coeffs.into_iter().enumerate() {
             let mut coeffs = into_resized(coeffs, num_total_vars);
-            coeffs.append(num_vars + cur_slack_var, f1!());
+            coeffs.append(num_vars + cur_slack_var, f1_ab!());
             orig_constraints = orig_constraints.append_outer_csvec(coeffs.view());
         }
         let orig_constraints_csc = orig_constraints.to_csc();
@@ -269,7 +267,7 @@ impl Solver {
 
         let enable_dual_steepest_edge = enable_steepest_edge;
         let dual_edge_sq_norms = if enable_dual_steepest_edge {
-            vec![f1!(); basic_vars.len()]
+            vec![f1_ab!(); basic_vars.len()]
         } else {
             vec![]
         };
@@ -278,7 +276,7 @@ impl Solver {
         // Thus we can skip expensive calculations for primal sq. norms.
         let enable_primal_steepest_edge = enable_steepest_edge && !is_dual_feasible;
         let sq_norms_update_helper = if enable_primal_steepest_edge {
-            vec![f0!(); num_total_vars - num_constraints]
+            vec![f0_ab!(); num_total_vars - num_constraints]
         } else {
             vec![]
         };
@@ -290,11 +288,11 @@ impl Solver {
 
             if need_artificial_obj {
                 let coeff = if state.at_min && !state.at_max {
-                    f1!()
+                    f1_ab!()
                 } else if state.at_max && !state.at_min {
-                    -f1!()
+                    -f1_ab!()
                 } else {
-                    f0!()
+                    f0_ab!()
                 };
                 nb_var_obj_coeffs.push(coeff);
             } else {
@@ -302,11 +300,15 @@ impl Solver {
             }
 
             if enable_primal_steepest_edge {
-                primal_edge_sq_norms.push(col.squared_l2_norm() + f1!());
+                primal_edge_sq_norms.push(col.squared_l2_norm() + f1_ab!());
             }
         }
 
-        let cur_obj_val = if need_artificial_obj { f0!() } else { obj_val };
+        let cur_obj_val = if need_artificial_obj {
+            f0_ab!()
+        } else {
+            obj_val
+        };
 
         let mut scratch = ScratchSpace::with_capacity(num_constraints);
         let lu_factors = lu_factorise(
@@ -317,7 +319,7 @@ impl Solver {
                     .unwrap()
                     .into_raw_storage()
             },
-            f!(1, 10),
+            f_ab!(1, 10),
             &mut scratch,
         )
         .unwrap();
@@ -375,14 +377,14 @@ impl Solver {
         Ok(res)
     }
 
-    pub(crate) fn get_value(&self, var: usize) -> &Fraction {
+    pub(crate) fn get_value(&self, var: usize) -> &AbnormalFraction {
         match self.var_states[var] {
             VarState::Basic(idx) => &self.basic_var_vals[idx],
             VarState::NonBasic(idx) => &self.nb_var_vals[idx],
         }
     }
 
-    pub(crate) fn fix_var(&mut self, var: usize, val: Fraction) -> Result<(), Error> {
+    pub(crate) fn fix_var(&mut self, var: usize, val: AbnormalFraction) -> Result<(), Error> {
         if val < self.orig_var_mins[var] || val > self.orig_var_maxs[var] {
             return Err(Error::Infeasible);
         }
@@ -556,7 +558,7 @@ impl Solver {
         &mut self,
         mut coeffs: CsVec,
         cmp_op: ComparisonOp,
-        rhs: Fraction,
+        rhs: AbnormalFraction,
     ) -> Result<(), Error> {
         assert!(self.is_primal_feasible);
         assert!(self.is_dual_feasible);
@@ -577,12 +579,12 @@ impl Solver {
 
         let slack_var = self.num_total_vars();
         let (slack_var_min, slack_var_max) = match cmp_op {
-            ComparisonOp::Le => (f0!(), Fraction::infinity()),
-            ComparisonOp::Ge => (Fraction::neg_infinity(), f0!()),
-            ComparisonOp::Eq => (f0!(), f0!()),
+            ComparisonOp::Le => (f0_ab!(), AbnormalFraction::infinity()),
+            ComparisonOp::Ge => (AbnormalFraction::neg_infinity(), f0_ab!()),
+            ComparisonOp::Eq => (f0_ab!(), f0_ab!()),
         };
 
-        self.orig_obj_coeffs.push(f0!());
+        self.orig_obj_coeffs.push(f0_ab!());
         self.orig_var_mins.push(slack_var_min.clone());
         self.orig_var_maxs.push(slack_var_max.clone());
         self.var_states.push(VarState::Basic(self.basic_vars.len()));
@@ -590,7 +592,7 @@ impl Solver {
         self.basic_var_mins.push(slack_var_min);
         self.basic_var_maxs.push(slack_var_max);
 
-        let mut lhs_val = f0!();
+        let mut lhs_val = f0_ab!();
         for (var, coeff) in coeffs.iter() {
             let val = match self.var_states[var] {
                 VarState::Basic(idx) => &self.basic_var_vals[idx],
@@ -607,7 +609,7 @@ impl Solver {
                 new_orig_constraints.append_outer_csvec(resized_view(&row, new_num_total_vars));
         }
         coeffs = into_resized(coeffs, new_num_total_vars);
-        coeffs.append(slack_var, f1!());
+        coeffs.append(slack_var, f1_ab!());
         new_orig_constraints = new_orig_constraints.append_outer_csvec(coeffs.view());
 
         self.orig_rhs.push(rhs.clone());
@@ -640,9 +642,9 @@ impl Solver {
     }
 
     /// Number of infeasible basic vars and sum of their infeasibilities.
-    fn calc_primal_infeasibility(&self) -> (usize, Fraction) {
+    fn calc_primal_infeasibility(&self) -> (usize, AbnormalFraction) {
         let mut num_vars = 0;
-        let mut infeasibility = f0!();
+        let mut infeasibility = f0_ab!();
         for ((val, min), max) in self
             .basic_var_vals
             .iter()
@@ -661,15 +663,15 @@ impl Solver {
     }
 
     /// Number of infeasible obj. coeffs and sum of their infeasibilities.
-    fn calc_dual_infeasibility(&self) -> (usize, Fraction) {
+    fn calc_dual_infeasibility(&self) -> (usize, AbnormalFraction) {
         let mut num_vars = 0;
-        let mut infeasibility = f0!();
+        let mut infeasibility = f0_ab!();
         for (obj_coeff, var_state) in self.nb_var_obj_coeffs.iter().zip(&self.nb_var_states) {
             if !(var_state.at_min && obj_coeff.is_not_negative())
                 && !(var_state.at_max && obj_coeff.is_not_positive())
             {
                 num_vars += 1;
-                infeasibility += obj_coeff.abs();
+                infeasibility += obj_coeff.clone().abs();
             }
         }
         (num_vars, infeasibility)
@@ -687,7 +689,7 @@ impl Solver {
     /// Calculate current coeffs row for a single constraint (permuted according to nb_vars).
     fn calc_row_coeffs(&mut self, r_constr: usize) {
         self.basis_solver
-            .solve_transp(std::iter::once((r_constr, &f1!())))
+            .solve_transp(std::iter::once((r_constr, &f1_ab!())))
             .to_sparse_vec(&mut self.inv_basis_row_coeffs);
 
         self.row_coeffs.clear_and_resize(self.nb_vars.len());
@@ -720,7 +722,7 @@ impl Solver {
                 });
 
             let mut best_col = None;
-            let mut best_score = Fraction::neg_infinity();
+            let mut best_score = AbnormalFraction::neg_infinity();
             if self.enable_primal_steepest_edge {
                 for (col, obj_coeff) in filtered_obj_coeffs {
                     let score = obj_coeff * &(obj_coeff / &self.primal_edge_sq_norms[col]);
@@ -731,7 +733,7 @@ impl Solver {
                 }
             } else {
                 for (col, obj_coeff) in filtered_obj_coeffs {
-                    let score = obj_coeff.abs();
+                    let score = obj_coeff.clone().abs();
                     if score > best_score {
                         best_col = Some(col);
                         best_score = score;
@@ -757,7 +759,7 @@ impl Solver {
 
         self.calc_col_coeffs(entering_c);
 
-        let get_leaving_var_step = |r: usize, coeff: &Fraction| -> Fraction {
+        let get_leaving_var_step = |r: usize, coeff: &AbnormalFraction| -> AbnormalFraction {
             let val = &self.basic_var_vals[r];
             // leaving_diff = -entering_diff * coeff. From this we can determine
             // in which direction this basic var will change and select appropriate bound.
@@ -765,10 +767,10 @@ impl Solver {
                 || (!entering_diff_sign && coeff.is_positive())
             {
                 let max = &self.basic_var_maxs[r];
-                if val < max { max - val } else { f0!() }
+                if val < max { max - val } else { f0_ab!() }
             } else {
                 let min = &self.basic_var_mins[r];
-                if val > min { val - min } else { f0!() }
+                if val > min { val - min } else { f0_ab!() }
             }
         };
 
@@ -783,7 +785,7 @@ impl Solver {
         // remain feasible using relaxed bounds.
         let mut max_step = (&entering_other_val - &entering_cur_val).abs();
         for (r, coeff) in self.col_coeffs.iter() {
-            let coeff_abs = coeff.abs();
+            let coeff_abs = coeff.clone().abs();
             if coeff_abs.is_not_positive() {
                 continue;
             }
@@ -800,12 +802,12 @@ impl Solver {
         // abs. coefficient as the leaving variable. This means that we get numerically more stable
         // basis at the price of slight infeasibility of some basic variables.
         let mut leaving_r = None;
-        let mut leaving_new_val = f0!();
-        let mut pivot_coeff_abs = Fraction::neg_infinity();
-        let mut pivot_coeff = f0!();
+        let mut leaving_new_val = f0_ab!();
+        let mut pivot_coeff_abs = AbnormalFraction::neg_infinity();
+        let mut pivot_coeff = f0_ab!();
         for (r, coeff) in self.col_coeffs.iter() {
             let coeff = coeff.clone();
-            let coeff_abs = coeff.abs();
+            let coeff_abs = coeff.clone().abs();
             if coeff_abs.is_not_positive() {
                 continue;
             }
@@ -855,7 +857,7 @@ impl Solver {
         }
     }
 
-    fn choose_pivot_row_dual(&self) -> Option<(usize, Fraction)> {
+    fn choose_pivot_row_dual(&self) -> Option<(usize, AbnormalFraction)> {
         let infeasibilities = self
             .basic_var_vals
             .iter()
@@ -873,7 +875,7 @@ impl Solver {
             });
 
         let mut leaving_r = None;
-        let mut max_score = Fraction::neg_infinity();
+        let mut max_score = AbnormalFraction::neg_infinity();
         if self.enable_dual_steepest_edge {
             for (r, infeasibility) in infeasibilities {
                 let sq_norm = &self.dual_edge_sq_norms[r];
@@ -922,21 +924,24 @@ impl Solver {
     fn choose_entering_col_dual(
         &self,
         row: usize,
-        leaving_new_val: Fraction,
+        leaving_new_val: AbnormalFraction,
     ) -> Result<PivotInfo, Error> {
         // True if the new obj. coeff. must be nonnegative in a dual-feasible configuration.
         let leaving_diff_sign = leaving_new_val > self.basic_var_vals[row];
 
-        fn clamp_obj_coeff(obj_coeff: &Fraction, var_state: &NonBasicVarState) -> Fraction {
+        fn clamp_obj_coeff(
+            obj_coeff: &AbnormalFraction,
+            var_state: &NonBasicVarState,
+        ) -> AbnormalFraction {
             if var_state.at_min && obj_coeff.is_negative() {
-                return f0!();
+                return f0_ab!();
             } else if var_state.at_max && obj_coeff.is_positive() {
-                return f0!();
+                return f0_ab!();
             }
             obj_coeff.clone()
         }
 
-        let is_eligible_var = |coeff: &Fraction, var_state: &NonBasicVarState| -> bool {
+        let is_eligible_var = |coeff: &AbnormalFraction, var_state: &NonBasicVarState| -> bool {
             let entering_diff_sign = if coeff.is_positive() {
                 !leaving_diff_sign
             } else if coeff.is_negative() {
@@ -961,7 +966,7 @@ impl Solver {
 
         // First, we determine the max step (change in the leaving variable obj. coeff that still
         // leaves us with a dual-feasible state) using relaxed bounds.
-        let mut max_step = Fraction::infinity();
+        let mut max_step = AbnormalFraction::infinity();
         for (c, coeff) in self.row_coeffs.iter() {
             let var_state = &self.nb_var_states[c];
             if !is_eligible_var(coeff, var_state) {
@@ -969,7 +974,7 @@ impl Solver {
             }
 
             let obj_coeff = clamp_obj_coeff(&self.nb_var_obj_coeffs[c], var_state);
-            let cur_step = (obj_coeff.abs()) / coeff.abs();
+            let cur_step = (obj_coeff.clone().abs()) / coeff.clone().abs();
             if cur_step < max_step {
                 max_step = cur_step;
             }
@@ -979,8 +984,8 @@ impl Solver {
         // the one with the biggest pivot coefficient. This allows for a much more
         // numerically stable basis at the price of slight infeasibility in dual variables.
         let mut entering_c = None;
-        let mut pivot_coeff_abs = Fraction::neg_infinity();
-        let mut pivot_coeff = f0!();
+        let mut pivot_coeff_abs = AbnormalFraction::neg_infinity();
+        let mut pivot_coeff = f0_ab!();
         for (c, coeff) in self.row_coeffs.iter() {
             let var_state = &self.nb_var_states[c];
             if !is_eligible_var(coeff, var_state) {
@@ -992,9 +997,9 @@ impl Solver {
             // If we change obj. coeff of the leaving variable by this amount,
             // obj. coeff if the current variable will reach the bound of dual infeasibility.
             // Variable with the tightest such bound is the entering variable.
-            let cur_step = obj_coeff.abs() / coeff.abs();
+            let cur_step = obj_coeff.abs() / coeff.clone().abs();
             if cur_step <= max_step {
-                let coeff_abs = coeff.abs();
+                let coeff_abs = coeff.clone().abs();
                 if coeff_abs > pivot_coeff_abs {
                     entering_c = Some(c);
                     pivot_coeff_abs = coeff_abs;
@@ -1105,7 +1110,7 @@ impl Solver {
         }
     }
 
-    fn update_primal_sq_norms(&mut self, entering_col: usize, pivot_coeff: &Fraction) {
+    fn update_primal_sq_norms(&mut self, entering_col: usize, pivot_coeff: &AbnormalFraction) {
         // Computations for the steepest edge pivoting rule. See
         // Forrest, J. J., & Goldfarb, D. (1992).
         // Steepest-edge simplex algorithms for linear programming.
@@ -1119,7 +1124,7 @@ impl Solver {
         for &r in tmp.indices() {
             for &v in self.orig_constraints.outer_view(r).unwrap().indices() {
                 if let VarState::NonBasic(idx) = self.var_states[v] {
-                    self.sq_norms_update_helper[idx] = f0!();
+                    self.sq_norms_update_helper[idx] = f0_ab!();
                 }
             }
         }
@@ -1135,7 +1140,7 @@ impl Solver {
         // now sq_norms_update_helper contains transp(N) * v vector.
 
         // Calculate pivot_sq_norm directly to avoid loss of precision.
-        let pivot_sq_norm = self.col_coeffs.sq_norm() + f1!();
+        let pivot_sq_norm = self.col_coeffs.sq_norm() + f1_ab!();
         // assert!((self.primal_edge_sq_norms[entering_col] - pivot_sq_norm).abs() < 0.1);
 
         let pivot_coeff_sq = pivot_coeff * pivot_coeff;
@@ -1144,7 +1149,7 @@ impl Solver {
                 self.primal_edge_sq_norms[c] = &pivot_sq_norm / &pivot_coeff_sq;
             } else {
                 self.primal_edge_sq_norms[c] +=
-                    &(-f!(2) * (r_coeff * &self.sq_norms_update_helper[c])) / pivot_coeff
+                    &(-f_ab!(2) * (r_coeff * &self.sq_norms_update_helper[c])) / pivot_coeff
                         + &(&pivot_sq_norm * &(r_coeff * r_coeff)) / &pivot_coeff_sq;
             }
 
@@ -1152,7 +1157,7 @@ impl Solver {
         }
     }
 
-    fn update_dual_sq_norms(&mut self, leaving_row: usize, pivot_coeff: &Fraction) {
+    fn update_dual_sq_norms(&mut self, leaving_row: usize, pivot_coeff: &AbnormalFraction) {
         // Computations for the dual steepest edge pivoting rule.
         // See the same reference (Forrest, Goldfarb).
 
@@ -1167,7 +1172,7 @@ impl Solver {
             if r == leaving_row {
                 self.dual_edge_sq_norms[r] = &pivot_sq_norm / &pivot_coeff_sq;
             } else {
-                self.dual_edge_sq_norms[r] += -f!(2) * (col_coeff * &(tau.get(r) / pivot_coeff))
+                self.dual_edge_sq_norms[r] += -f_ab!(2) * (col_coeff * &(tau.get(r) / pivot_coeff))
                     + &pivot_sq_norm * &(&(col_coeff * col_coeff) / &pivot_coeff_sq);
             }
 
@@ -1205,7 +1210,7 @@ impl Solver {
         }
 
         let multipliers = {
-            let mut rhs = vec![f0!(); self.num_constraints()];
+            let mut rhs = vec![f0_ab!(); self.num_constraints()];
             for (c, &var) in self.basic_vars.iter().enumerate() {
                 rhs[c] = self.orig_obj_coeffs[var].clone();
             }
@@ -1218,12 +1223,12 @@ impl Solver {
         self.nb_var_obj_coeffs.clear();
         for &var in &self.nb_vars {
             let col = self.orig_constraints_csc.outer_view(var).unwrap();
-            let dot_prod: Fraction = col.iter().map(|(r, val)| val * &multipliers[r]).sum();
+            let dot_prod: AbnormalFraction = col.iter().map(|(r, val)| val * &multipliers[r]).sum();
             self.nb_var_obj_coeffs
                 .push(&self.orig_obj_coeffs[var] - &dot_prod);
         }
 
-        self.cur_obj_val = f0!();
+        self.cur_obj_val = f0_ab!();
         for (r, &var) in self.basic_vars.iter().enumerate() {
             self.cur_obj_val += &self.orig_obj_coeffs[var] * &self.basic_var_vals[r];
         }
@@ -1237,7 +1242,7 @@ impl Solver {
         self.primal_edge_sq_norms.clear();
         for &var in &self.nb_vars {
             let col = self.orig_constraints_csc.outer_view(var).unwrap();
-            let sq_norm = self.basis_solver.solve(col.iter()).sq_norm() + f1!();
+            let sq_norm = self.basis_solver.solve(col.iter()).sq_norm() + f1_ab!();
             self.primal_edge_sq_norms.push(sq_norm);
         }
     }
@@ -1246,8 +1251,8 @@ impl Solver {
 #[derive(Debug)]
 struct PivotInfo {
     col: usize,
-    entering_new_val: Fraction,
-    entering_diff: Fraction,
+    entering_new_val: AbnormalFraction,
+    entering_diff: AbnormalFraction,
 
     /// Contains info about the intersection between pivot row and column.
     /// If it is None, objective can be decreased without changing the basis
@@ -1258,8 +1263,8 @@ struct PivotInfo {
 #[derive(Debug)]
 struct PivotElem {
     row: usize,
-    coeff: Fraction,
-    leaving_new_val: Fraction,
+    coeff: AbnormalFraction,
+    leaving_new_val: AbnormalFraction,
 }
 
 /// Stuff related to inversion of the basis matrix
@@ -1277,11 +1282,11 @@ impl BasisSolver {
         &mut self,
         col_coeffs: &SparseVec,
         r_leaving: usize,
-        pivot_coeff: &Fraction,
+        pivot_coeff: &AbnormalFraction,
     ) {
         let coeffs = col_coeffs.iter().map(|(r, coeff)| {
             let val = if r == r_leaving {
-                f1!() - &f1!() / pivot_coeff
+                f1_ab!() - &f1_ab!() / pivot_coeff
             } else {
                 coeff / pivot_coeff
             };
@@ -1302,14 +1307,17 @@ impl BasisSolver {
                     .unwrap()
                     .into_raw_storage()
             },
-            f!(1, 10),
+            f_ab!(1, 10),
             &mut self.scratch,
         )
         .unwrap(); // TODO: When is singular basis matrix possible? Report as a proper error.
         self.lu_factors_transp = self.lu_factors.transpose();
     }
 
-    fn solve<'a>(&mut self, rhs: impl Iterator<Item = (usize, &'a Fraction)>) -> &ScatteredVec {
+    fn solve<'a>(
+        &mut self,
+        rhs: impl Iterator<Item = (usize, &'a AbnormalFraction)>,
+    ) -> &ScatteredVec {
         self.rhs.set(rhs);
         self.lu_factors.solve(&mut self.rhs, &mut self.scratch);
 
@@ -1328,12 +1336,12 @@ impl BasisSolver {
     /// Pass right-hand side via self.rhs
     fn solve_transp<'a>(
         &mut self,
-        rhs: impl Iterator<Item = (usize, &'a Fraction)>,
+        rhs: impl Iterator<Item = (usize, &'a AbnormalFraction)>,
     ) -> &ScatteredVec {
         self.rhs.set(rhs);
         // apply eta matrices in reverse (Vanderbei p.139)
         for idx in (0..self.eta_matrices.len()).rev() {
-            let mut coeff = f0!();
+            let mut coeff = f0_ab!();
             // eta col `dot` rhs_transp
             for (i, val) in self.eta_matrices.coeff_cols.col_iter(idx) {
                 coeff += val * self.rhs.get(i);
@@ -1371,7 +1379,11 @@ impl EtaMatrices {
         self.coeff_cols.clear_and_resize(n_rows);
     }
 
-    fn push(&mut self, leaving_row: usize, coeffs: impl Iterator<Item = (usize, Fraction)>) {
+    fn push(
+        &mut self,
+        leaving_row: usize,
+        coeffs: impl Iterator<Item = (usize, AbnormalFraction)>,
+    ) {
         self.leaving_rows.push(leaving_row);
         self.coeff_cols.append_col(coeffs);
     }
@@ -1395,23 +1407,25 @@ fn into_resized(vec: CsVec, len: usize) -> CsVec {
 
 #[cfg(test)]
 mod tests {
-    use ebi_arithmetic::{f, f1};
 
-    use crate::linear_programming_helpers::{assert_matrix_eq, to_sparse};
+    use crate::{
+        f1_ab,
+        linear_programming_helpers::{assert_matrix_eq, to_sparse},
+    };
 
     use super::*;
 
     #[test]
     fn initialize() {
         let sol = Solver::try_new(
-            &[f!(2), f1!()],
-            &[Fraction::neg_infinity(), f!(5)],
-            &[f0!(), Fraction::infinity()],
+            &[f_ab!(2), f1_ab!()],
+            &[AbnormalFraction::neg_infinity(), f_ab!(5)],
+            &[f0_ab!(), AbnormalFraction::infinity()],
             &[
-                (to_sparse(&[f1!(), f1!()]), ComparisonOp::Le, f!(6)),
-                (to_sparse(&[f1!(), f!(2)]), ComparisonOp::Le, f!(8)),
-                (to_sparse(&[f1!(), f1!()]), ComparisonOp::Ge, f!(2)),
-                (to_sparse(&[f0!(), f1!()]), ComparisonOp::Eq, f!(3)),
+                (to_sparse(&[f1_ab!(), f1_ab!()]), ComparisonOp::Le, f_ab!(6)),
+                (to_sparse(&[f1_ab!(), f_ab!(2)]), ComparisonOp::Le, f_ab!(8)),
+                (to_sparse(&[f1_ab!(), f1_ab!()]), ComparisonOp::Ge, f_ab!(2)),
+                (to_sparse(&[f0_ab!(), f1_ab!()]), ComparisonOp::Eq, f_ab!(3)),
             ],
         )
         .unwrap();
@@ -1422,63 +1436,77 @@ mod tests {
 
         assert_eq!(
             &sol.orig_obj_coeffs,
-            &[f!(2), f1!(), f0!(), f0!(), f0!(), f0!()]
+            &[f_ab!(2), f1_ab!(), f0_ab!(), f0_ab!(), f0_ab!(), f0_ab!()]
         );
 
         assert_eq!(
             &sol.orig_var_mins,
             &[
-                Fraction::neg_infinity(),
-                f!(5),
-                f0!(),
-                f0!(),
-                Fraction::neg_infinity(),
-                f0!(),
+                AbnormalFraction::neg_infinity(),
+                f_ab!(5),
+                f0_ab!(),
+                f0_ab!(),
+                AbnormalFraction::neg_infinity(),
+                f0_ab!(),
             ]
         );
         assert_eq!(
             &sol.orig_var_maxs,
             &[
-                f0!(),
-                Fraction::infinity(),
-                Fraction::infinity(),
-                Fraction::infinity(),
-                f0!(),
-                f0!()
+                f0_ab!(),
+                AbnormalFraction::infinity(),
+                AbnormalFraction::infinity(),
+                AbnormalFraction::infinity(),
+                f0_ab!(),
+                f0_ab!()
             ]
         );
 
         let orig_constraints_ref = vec![
-            vec![f1!(), f1!(), f1!(), f0!(), f0!(), f0!()],
-            vec![f1!(), f!(2), f0!(), f1!(), f0!(), f0!()],
-            vec![f1!(), f1!(), f0!(), f0!(), f1!(), f0!()],
-            vec![f0!(), f1!(), f0!(), f0!(), f0!(), f1!()],
+            vec![f1_ab!(), f1_ab!(), f1_ab!(), f0_ab!(), f0_ab!(), f0_ab!()],
+            vec![f1_ab!(), f_ab!(2), f0_ab!(), f1_ab!(), f0_ab!(), f0_ab!()],
+            vec![f1_ab!(), f1_ab!(), f0_ab!(), f0_ab!(), f1_ab!(), f0_ab!()],
+            vec![f0_ab!(), f1_ab!(), f0_ab!(), f0_ab!(), f0_ab!(), f1_ab!()],
         ];
         assert_matrix_eq(&sol.orig_constraints, &orig_constraints_ref);
 
-        assert_eq!(&sol.orig_rhs, &[f!(6), f!(8), f!(2), f!(3)]);
+        assert_eq!(&sol.orig_rhs, &[f_ab!(6), f_ab!(8), f_ab!(2), f_ab!(3)]);
 
         assert_eq!(&sol.basic_vars, &[2, 3, 4, 5]);
-        assert_eq!(&sol.basic_var_vals, &[f1!(), -f!(2), -f!(3), -f!(2)]);
-        assert_eq!(&sol.dual_edge_sq_norms, &[f1!(), f1!(), f1!(), f1!()]);
+        assert_eq!(
+            &sol.basic_var_vals,
+            &[f1_ab!(), -f_ab!(2), -f_ab!(3), -f_ab!(2)]
+        );
+        assert_eq!(
+            &sol.dual_edge_sq_norms,
+            &[f1_ab!(), f1_ab!(), f1_ab!(), f1_ab!()]
+        );
 
         assert_eq!(&sol.nb_vars, &[0, 1]);
-        assert_eq!(&sol.nb_var_obj_coeffs, &[-f1!(), f1!()]);
-        assert_eq!(&sol.nb_var_vals, &[f0!(), f!(5)]);
-        assert_eq!(&sol.primal_edge_sq_norms, &[f!(4), f!(8)]);
+        assert_eq!(&sol.nb_var_obj_coeffs, &[-f1_ab!(), f1_ab!()]);
+        assert_eq!(&sol.nb_var_vals, &[f0_ab!(), f_ab!(5)]);
+        assert_eq!(&sol.primal_edge_sq_norms, &[f_ab!(4), f_ab!(8)]);
 
-        assert_eq!(sol.cur_obj_val, f0!());
+        assert_eq!(sol.cur_obj_val, f0_ab!());
     }
 
     #[test]
     fn initial_solve() {
         let mut sol = Solver::try_new(
-            &[-f!(3), -f!(4)],
-            &[Fraction::neg_infinity(), f!(5)],
-            &[f!(20), Fraction::infinity()],
+            &[-f_ab!(3), -f_ab!(4)],
+            &[AbnormalFraction::neg_infinity(), f_ab!(5)],
+            &[f_ab!(20), AbnormalFraction::infinity()],
             &[
-                (to_sparse(&[f1!(), f1!()]), ComparisonOp::Le, f!(20)),
-                (to_sparse(&[-f1!(), f!(4)]), ComparisonOp::Le, f!(20)),
+                (
+                    to_sparse(&[f1_ab!(), f1_ab!()]),
+                    ComparisonOp::Le,
+                    f_ab!(20),
+                ),
+                (
+                    to_sparse(&[-f1_ab!(), f_ab!(4)]),
+                    ComparisonOp::Le,
+                    f_ab!(20),
+                ),
             ],
         )
         .unwrap();
@@ -1488,19 +1516,26 @@ mod tests {
         assert!(sol.is_dual_feasible);
 
         assert_eq!(&sol.basic_vars, &[0, 1]);
-        assert_eq!(&sol.basic_var_vals, &[f!(12), f!(8)]);
+        assert_eq!(&sol.basic_var_vals, &[f_ab!(12), f_ab!(8)]);
         assert_eq!(&sol.nb_vars, &[2, 3]);
-        assert_eq!(&sol.nb_var_vals, &[f0!(), f0!()]);
-        assert_eq!(&sol.nb_var_obj_coeffs, &[f!(32, 10), f!(1, 5)]);
-        assert_eq!(sol.cur_obj_val, -f!(68));
+        assert_eq!(&sol.nb_var_vals, &[f0_ab!(), f0_ab!()]);
+        assert_eq!(&sol.nb_var_obj_coeffs, &[f_ab!(32, 10), f_ab!(1, 5)]);
+        assert_eq!(sol.cur_obj_val, -f_ab!(68));
 
         let infeasible = Solver::try_new(
-            &[f1!(), f1!()],
-            &[f0!(), f0!()],
-            &[Fraction::infinity(), Fraction::neg_infinity()],
+            &[f1_ab!(), f1_ab!()],
+            &[f0_ab!(), f0_ab!()],
             &[
-                (to_sparse(&[f1!(), f1!()]), ComparisonOp::Ge, f!(10)),
-                (to_sparse(&[f1!(), f1!()]), ComparisonOp::Le, f!(5)),
+                AbnormalFraction::infinity(),
+                AbnormalFraction::neg_infinity(),
+            ],
+            &[
+                (
+                    to_sparse(&[f1_ab!(), f1_ab!()]),
+                    ComparisonOp::Ge,
+                    f_ab!(10),
+                ),
+                (to_sparse(&[f1_ab!(), f1_ab!()]), ComparisonOp::Le, f_ab!(5)),
             ],
         );
         // .unwrap()
