@@ -750,12 +750,15 @@ impl Solver {
 
         let entering_cur_val = self.nb_var_vals[entering_c].clone();
         // If true, entering variable will increase (because the objective function must decrease).
+        println!("something {}", self.nb_var_obj_coeffs[entering_c]);
         let entering_diff_sign = self.nb_var_obj_coeffs[entering_c].is_negative();
+        println!("diff sign {}", entering_diff_sign);
         let entering_other_val = if entering_diff_sign {
             self.orig_var_maxs[self.nb_vars[entering_c]].clone()
         } else {
             self.orig_var_mins[self.nb_vars[entering_c]].clone()
         };
+        println!("entering_other_val {}", entering_other_val);
 
         self.calc_col_coeffs(entering_c);
 

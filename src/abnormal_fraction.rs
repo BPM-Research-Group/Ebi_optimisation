@@ -25,12 +25,12 @@ impl AbnormalFraction {
         Self::NegInfinite
     }
 
-    /// Returns false if this value is positive infinity or negative infinity, and true otherwise.
+    /// Returns `true` if this number is neither infinite nor NaN.
     pub fn is_finite(&self) -> bool {
         match self {
             AbnormalFraction::Normal(_) => true,
             AbnormalFraction::Infinite | AbnormalFraction::NegInfinite => false,
-            AbnormalFraction::NaN => true,
+            AbnormalFraction::NaN => false,
         }
     }
 
@@ -96,6 +96,24 @@ impl Signed for AbnormalFraction {
             AbnormalFraction::Infinite => false,
             AbnormalFraction::NegInfinite => true,
             AbnormalFraction::NaN => false,
+        }
+    }
+
+    fn is_not_negative(&self) -> bool {
+        match self {
+            AbnormalFraction::Normal(f) => f.is_not_negative(),
+            AbnormalFraction::Infinite => true,
+            AbnormalFraction::NegInfinite => false,
+            AbnormalFraction::NaN => true,
+        }
+    }
+
+    fn is_not_positive(&self) -> bool {
+        match self {
+            AbnormalFraction::Normal(f) => f.is_not_positive(),
+            AbnormalFraction::Infinite => false,
+            AbnormalFraction::NegInfinite => true,
+            AbnormalFraction::NaN => true,
         }
     }
 }
@@ -251,7 +269,8 @@ impl Add for AbnormalFraction {
     type Output = AbnormalFraction;
 
     fn add(self, rhs: Self) -> Self::Output {
-        match (self, rhs) {
+        print!("add {} + {}", self, rhs);
+        let x = match (self, rhs) {
             (AbnormalFraction::Normal(f1), AbnormalFraction::Normal(f2)) => Self::Normal(f1 + f2),
             (AbnormalFraction::Normal(_), AbnormalFraction::Infinite) => AbnormalFraction::Infinite,
             (AbnormalFraction::Normal(_), AbnormalFraction::NegInfinite) => {
@@ -269,7 +288,9 @@ impl Add for AbnormalFraction {
             }
             (_, AbnormalFraction::NaN) => AbnormalFraction::NaN,
             (AbnormalFraction::NaN, _) => AbnormalFraction::NaN,
-        }
+        };
+        println!(" = {}", x);
+        x
     }
 }
 
@@ -277,7 +298,7 @@ impl Add for &AbnormalFraction {
     type Output = AbnormalFraction;
 
     fn add(self, rhs: Self) -> Self::Output {
-        match (self, rhs) {
+        let x = match (self, rhs) {
             (AbnormalFraction::Normal(f1), AbnormalFraction::Normal(f2)) => {
                 AbnormalFraction::Normal(f1 + f2)
             }
@@ -297,15 +318,20 @@ impl Add for &AbnormalFraction {
             }
             (_, AbnormalFraction::NaN) => AbnormalFraction::NaN,
             (AbnormalFraction::NaN, _) => AbnormalFraction::NaN,
-        }
+        };
+        println!("add {} + {} = {}", self, rhs, x);
+        x
     }
 }
 
 impl AddAssign for AbnormalFraction {
     fn add_assign(&mut self, rhs: Self) {
+        print!("add_assign {} + {}", self, rhs);
         if self.both_normal(&rhs) {
             if let (AbnormalFraction::Normal(f1), AbnormalFraction::Normal(f2)) = (self, rhs) {
                 *f1 += f2;
+
+                println!(" = {}", f1);
             } else {
                 unreachable!()
             }
@@ -331,6 +357,7 @@ impl AddAssign for AbnormalFraction {
                 (_, AbnormalFraction::NaN) => *self = AbnormalFraction::NaN,
                 (AbnormalFraction::NaN, _) => {}
             };
+            println!(" = {}", self);
         }
     }
 }
@@ -339,6 +366,7 @@ impl Sub for AbnormalFraction {
     type Output = AbnormalFraction;
 
     fn sub(self, rhs: Self) -> Self::Output {
+        println!("sub {} - {}", self, rhs);
         match (&self, &rhs) {
             (AbnormalFraction::Normal(f1), AbnormalFraction::Normal(f2)) => {
                 AbnormalFraction::Normal(f1 - f2)
@@ -371,6 +399,7 @@ impl Sub for &AbnormalFraction {
     type Output = AbnormalFraction;
 
     fn sub(self, rhs: Self) -> Self::Output {
+        println!("sub {} - {}", self, rhs);
         match (&self, &rhs) {
             (AbnormalFraction::Normal(f1), AbnormalFraction::Normal(f2)) => {
                 AbnormalFraction::Normal(f1 - f2)
@@ -401,6 +430,7 @@ impl Sub for &AbnormalFraction {
 
 impl SubAssign for AbnormalFraction {
     fn sub_assign(&mut self, rhs: Self) {
+        println!("sub_assign {} - {}", self, rhs);
         if self.both_normal(&rhs) {
             if let (AbnormalFraction::Normal(f1), AbnormalFraction::Normal(f2)) = (self, rhs) {
                 *f1 -= f2;
@@ -437,7 +467,8 @@ impl Mul for AbnormalFraction {
     type Output = AbnormalFraction;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        match (&self, &rhs) {
+        print!("mul {} * {}", self, rhs);
+        let x = match (&self, &rhs) {
             (AbnormalFraction::Normal(f1), AbnormalFraction::Normal(f2)) => {
                 AbnormalFraction::Normal(f1 * f2)
             }
@@ -486,7 +517,9 @@ impl Mul for AbnormalFraction {
             }
             (_, AbnormalFraction::NaN) => AbnormalFraction::NaN,
             (AbnormalFraction::NaN, _) => AbnormalFraction::NaN,
-        }
+        };
+        println!(" = {}", x);
+        x
     }
 }
 
@@ -494,7 +527,8 @@ impl Mul for &AbnormalFraction {
     type Output = AbnormalFraction;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        match (&self, &rhs) {
+        print!("mul {} * {}", self, rhs);
+        let x = match (&self, &rhs) {
             (AbnormalFraction::Normal(f1), AbnormalFraction::Normal(f2)) => {
                 AbnormalFraction::Normal(f1 * f2)
             }
@@ -543,7 +577,9 @@ impl Mul for &AbnormalFraction {
             }
             (_, AbnormalFraction::NaN) => AbnormalFraction::NaN,
             (AbnormalFraction::NaN, _) => AbnormalFraction::NaN,
-        }
+        };
+        println!(" = {}", x);
+        x
     }
 }
 
@@ -551,7 +587,8 @@ impl Div for AbnormalFraction {
     type Output = AbnormalFraction;
 
     fn div(self, rhs: Self) -> Self::Output {
-        match (&self, &rhs) {
+        print!("div {} / {}", self, rhs);
+        let x = match (&self, &rhs) {
             (AbnormalFraction::Normal(f1), AbnormalFraction::Normal(f2)) if !f2.is_zero() => {
                 AbnormalFraction::Normal(f1 / f2)
             }
@@ -586,7 +623,9 @@ impl Div for AbnormalFraction {
             (AbnormalFraction::NegInfinite, AbnormalFraction::NegInfinite) => AbnormalFraction::NaN,
             (_, AbnormalFraction::NaN) => AbnormalFraction::NaN,
             (AbnormalFraction::NaN, _) => AbnormalFraction::NaN,
-        }
+        };
+        println!(" = {}", x);
+        x
     }
 }
 
@@ -594,7 +633,8 @@ impl Div for &AbnormalFraction {
     type Output = AbnormalFraction;
 
     fn div(self, rhs: Self) -> Self::Output {
-        match (&self, &rhs) {
+        print!("div {} / {}", self, rhs);
+        let x = match (&self, &rhs) {
             (AbnormalFraction::Normal(f1), AbnormalFraction::Normal(f2)) if !f2.is_zero() => {
                 AbnormalFraction::Normal(f1 / f2)
             }
@@ -629,7 +669,9 @@ impl Div for &AbnormalFraction {
             (AbnormalFraction::NegInfinite, AbnormalFraction::NegInfinite) => AbnormalFraction::NaN,
             (_, AbnormalFraction::NaN) => AbnormalFraction::NaN,
             (AbnormalFraction::NaN, _) => AbnormalFraction::NaN,
-        }
+        };
+        println!(" = {}", x);
+        x
     }
 }
 
@@ -683,3 +725,18 @@ macro_rules! f1_ab {
 pub use f1_ab;
 use malachite::rational::Rational;
 use pathfinding::num_traits;
+
+#[cfg(test)]
+mod tests {
+    use ebi_arithmetic::Zero;
+
+    use crate::abnormal_fraction::AbnormalFraction;
+
+    #[test]
+    fn abnormal_fraction() {
+        assert!(AbnormalFraction::zero().is_zero());
+        assert!(!AbnormalFraction::infinity().is_zero());
+        assert!(AbnormalFraction::infinity().is_infinite());
+        assert!(!AbnormalFraction::infinity().is_finite());
+    }
+}

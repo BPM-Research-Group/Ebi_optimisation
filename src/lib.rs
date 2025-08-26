@@ -1,4 +1,4 @@
-
+pub mod abnormal_fraction;
 pub mod astar;
 pub mod linear_programming;
 pub mod linear_programming_helpers;
@@ -8,4 +8,3 @@ pub mod linear_programming_solver;
 pub mod linear_programming_sparse;
 pub mod network_simplex;
 pub mod network_simplex_value_type;
-pub mod abnormal_fraction;

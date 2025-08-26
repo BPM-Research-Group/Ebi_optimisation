@@ -679,13 +679,23 @@ mod tests {
     #[test]
     fn gomory_cut() {
         let mut problem = Problem::new(OptimisationDirection::Minimise);
+
+        println!("{:?}", problem);
+
         let v1 = problem.add_var(f0_ab!(), (f0_ab!(), AbnormalFraction::infinity()));
         let v2 = problem.add_var(-f1_ab!(), (f0_ab!(), AbnormalFraction::infinity()));
+
+        println!("{:?}", problem);
+        println!("{:?}", v1);
+
         problem.add_constraint(
             &[(v1, f_ab!(3)), (v2, f_ab!(2))],
             ComparisonOp::Le,
             f_ab!(6),
         );
+
+        println!("{:?}", problem);
+
         problem.add_constraint(
             &[(v1, -f_ab!(3)), (v2, f_ab!(2))],
             ComparisonOp::Le,
@@ -706,5 +716,31 @@ mod tests {
         assert!(AbnormalFraction::abs(&sol[v1] - &f1_ab!()) < f_ab!(1, 1000000000));
         assert_eq!(sol[v2], f1_ab!());
         assert_eq!(sol.objective(), -f1_ab!());
+    }
+
+     #[test]
+    fn gomory_cut_original() {
+        let mut problem = minilp::Problem::new(minilp::OptimizationDirection::Minimize);
+        let v1 = problem.add_var(0.0, (0.0, f64::INFINITY));
+        let v2 = problem.add_var(-1.0, (0.0, f64::INFINITY));
+        problem.add_constraint(&[(v1, 3.0), (v2, 2.0)], minilp::ComparisonOp::Le, 6.0);
+        problem.add_constraint(&[(v1, -3.0), (v2, 2.0)], minilp::ComparisonOp::Le, 0.0);
+
+        println!("bla");
+
+        let mut sol = problem.solve().unwrap();
+        assert_eq!(sol[v1], 1.0);
+        assert_eq!(sol[v2], 1.5);
+        assert_eq!(sol.objective(), -1.5);
+
+        sol = sol.add_gomory_cut(v2).unwrap();
+        assert!(f64::abs(sol[v1] - 2.0 / 3.0) < 1e-8);
+        assert_eq!(sol[v2], 1.0);
+        assert_eq!(sol.objective(), -1.0);
+
+        sol = sol.add_gomory_cut(v1).unwrap();
+        assert!(f64::abs(sol[v1] - 1.0) < 1e-8);
+        assert_eq!(sol[v2], 1.0);
+        assert_eq!(sol.objective(), -1.0);
     }
 }
