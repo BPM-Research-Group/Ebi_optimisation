@@ -1,5 +1,5 @@
 use ebi_arithmetic::{Fraction, fraction::fraction_f64::FractionF64};
-use malachite::Integer;
+use malachite::{Integer, Natural};
 
 pub trait MulWithFloat {
     fn mul_with_float(self, rhs: &f64) -> Self;
@@ -26,6 +26,13 @@ impl MulWithFloat for i128 {
 }
 
 impl MulWithFloat for Integer {
+    fn mul_with_float(self, _rhs: &f64) -> Self {
+        // this should never occur. it is necessary to make network simplex work on both integers and floats
+        panic!("Cannot multiply values of different types");
+    }
+}
+
+impl MulWithFloat for Natural {
     fn mul_with_float(self, _rhs: &f64) -> Self {
         // this should never occur. it is necessary to make network simplex work on both integers and floats
         panic!("Cannot multiply values of different types");
