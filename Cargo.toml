@@ -35,7 +35,7 @@ rayon = "1.11.0"
 rand = "0.8.5"
 parking_lot = "0.12.4"
 pathfinding = "4.14.0"
-malachite = "*"
+malachite = "0.6.1"
 
 [profile.release]
 debug = false
