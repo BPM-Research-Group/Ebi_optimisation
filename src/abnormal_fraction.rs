@@ -199,6 +199,23 @@ impl MaybeExact for AbnormalFraction {
             }
         }
     }
+    fn to_approx(self) -> anyhow::Result<Self::Approximate> {
+        match self {
+            AbnormalFraction::Normal(f) => f.to_approx(),
+            AbnormalFraction::Infinite | AbnormalFraction::NegInfinite | AbnormalFraction::NaN => {
+                Err(anyhow!("cannot extract an approximate value"))
+            }
+        }
+    }
+
+    fn to_exact(self) -> anyhow::Result<Self::Exact> {
+        match self {
+            AbnormalFraction::Normal(f) => f.to_exact(),
+            AbnormalFraction::Infinite | AbnormalFraction::NegInfinite | AbnormalFraction::NaN => {
+                Err(anyhow!("cannot extract an exact value"))
+            }
+        }
+    }
 }
 
 impl PartialOrd for AbnormalFraction {
