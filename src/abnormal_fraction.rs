@@ -182,35 +182,35 @@ impl MaybeExact for AbnormalFraction {
         }
     }
 
-    fn extract_approx(&self) -> anyhow::Result<&Self::Approximate> {
+    fn approx_ref(&self) -> anyhow::Result<&Self::Approximate> {
         match self {
-            AbnormalFraction::Normal(f) => f.extract_approx(),
+            AbnormalFraction::Normal(f) => f.approx_ref(),
             AbnormalFraction::Infinite | AbnormalFraction::NegInfinite | AbnormalFraction::NaN => {
                 Err(anyhow!("cannot extract an approximate value"))
             }
         }
     }
 
-    fn extract_exact(&self) -> anyhow::Result<&Self::Exact> {
+    fn exact_ref(&self) -> anyhow::Result<&Self::Exact> {
         match self {
-            AbnormalFraction::Normal(f) => f.extract_exact(),
+            AbnormalFraction::Normal(f) => f.exact_ref(),
             AbnormalFraction::Infinite | AbnormalFraction::NegInfinite | AbnormalFraction::NaN => {
                 Err(anyhow!("cannot extract an exact value"))
             }
         }
     }
-    fn to_approx(self) -> anyhow::Result<Self::Approximate> {
+    fn approx(self) -> anyhow::Result<Self::Approximate> {
         match self {
-            AbnormalFraction::Normal(f) => f.to_approx(),
+            AbnormalFraction::Normal(f) => f.approx(),
             AbnormalFraction::Infinite | AbnormalFraction::NegInfinite | AbnormalFraction::NaN => {
                 Err(anyhow!("cannot extract an approximate value"))
             }
         }
     }
 
-    fn to_exact(self) -> anyhow::Result<Self::Exact> {
+    fn exact(self) -> anyhow::Result<Self::Exact> {
         match self {
-            AbnormalFraction::Normal(f) => f.to_exact(),
+            AbnormalFraction::Normal(f) => f.exact(),
             AbnormalFraction::Infinite | AbnormalFraction::NegInfinite | AbnormalFraction::NaN => {
                 Err(anyhow!("cannot extract an exact value"))
             }
