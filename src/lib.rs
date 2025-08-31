@@ -8,3 +8,5 @@ pub mod astar;
 pub mod abnormal_fraction;
 pub mod network_simplex;
 pub mod network_simplex_value_type;
+
+pub use ebi_arithmetic;
