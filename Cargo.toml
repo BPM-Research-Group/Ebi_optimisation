@@ -1,6 +1,6 @@
 [package]
 name = "ebi_optimisation"
-version = "0.0.10"
+version = "0.3.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 keywords = ["stochastic-processes", "process-mining", "business-processes"]
@@ -23,7 +23,7 @@ approximatearithmetic = [ "eapproximatearithmetic", "ebi_arithmetic/approximatea
 eapproximatearithmetic = []
 
 [dependencies]
-ebi_arithmetic = "0.2.22"
+ebi_arithmetic = "0.3.0"
 anyhow = "1.0.99"
 ndarray = "0.16.1"
 sprs = "0.11.3"
@@ -31,10 +31,10 @@ indexmap = "2.11.0"
 rustc-hash = "2.1.1"
 log = "0.4.28"
 rayon = "1.11.0"
-rand = "0.8.5"
+rand = "0.9.2"
 parking_lot = "0.12.4"
 pathfinding = "4.14.0"
-malachite = "0.6.1"
+malachite = "0.7.0"
 
 [profile.release]
 debug = false
