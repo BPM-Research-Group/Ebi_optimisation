@@ -3,7 +3,8 @@ use core::convert::From;
 use ebi_arithmetic::exact::MaybeExact;
 use ebi_arithmetic::{One, Signed, Zero};
 use malachite::Integer;
-use rand::{seq::SliceRandom, thread_rng};
+use rand::rng;
+use rand::seq::SliceRandom;
 use rayon::ThreadPool;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -310,7 +311,7 @@ where
                 .collect();
 
             // Shuffle the combined data
-            let mut rng = thread_rng();
+            let mut rng = rng();
             arcs.shuffle(&mut rng);
 
             // Unpack the data back into separate vectors
