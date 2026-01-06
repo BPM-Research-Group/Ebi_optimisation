@@ -740,7 +740,7 @@ macro_rules! f1_ab {
     };
 }
 pub use f1_ab;
-use malachite::rational::Rational;
+use ebi_arithmetic::malachite::rational::Rational;
 use pathfinding::num_traits;
 
 #[cfg(test)]

@@ -1,5 +1,8 @@
-use ebi_arithmetic::{Fraction, fraction::fraction_f64::FractionF64};
-use malachite::{Integer, Natural};
+use ebi_arithmetic::{
+    Fraction,
+    fraction::fraction_f64::FractionF64,
+    malachite::{Integer, Natural},
+};
 
 pub trait MulWithFloat {
     fn mul_with_float(self, rhs: &f64) -> Self;
