@@ -10,3 +10,6 @@ pub mod network_simplex;
 pub mod network_simplex_value_type;
 
 pub use ebi_arithmetic;
+pub use ebi_arithmetic::rand;
+pub use ebi_arithmetic::anyhow;
+pub use ebi_arithmetic::malachite;

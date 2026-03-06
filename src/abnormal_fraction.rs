@@ -1,12 +1,10 @@
+use ebi_arithmetic::{Fraction, MaybeExact, One, Round, Signed, Zero, anyhow::{self, anyhow}};
 use std::{
     cmp::Ordering,
     fmt::Display,
     iter::Sum,
     ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign},
 };
-
-use anyhow::anyhow;
-use ebi_arithmetic::{Fraction, MaybeExact, One, Round, Signed, Zero};
 
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub enum AbnormalFraction {
@@ -739,8 +737,8 @@ macro_rules! f1_ab {
         AbnormalFraction::one()
     };
 }
-pub use f1_ab;
 use ebi_arithmetic::malachite::rational::Rational;
+pub use f1_ab;
 use pathfinding::num_traits;
 
 #[cfg(test)]

@@ -1,9 +1,9 @@
 use super::network_simplex_value_type::{MulWithFloat, ToBigInt};
 use core::convert::From;
 use ebi_arithmetic::exact::MaybeExact;
+use ebi_arithmetic::rand::rng;
+use ebi_arithmetic::rand::seq::SliceRandom;
 use ebi_arithmetic::{One, Signed, Zero, malachite::Integer};
-use rand::rng;
-use rand::seq::SliceRandom;
 use rayon::ThreadPool;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
