@@ -1,4 +1,7 @@
-use ebi_arithmetic::{Fraction, MaybeExact, One, Round, Signed, Zero, anyhow::{self, anyhow}};
+use ebi_arithmetic::{
+    Fraction, MaybeExact, One, Round, Signed, Zero,
+    anyhow::{self, anyhow},
+};
 use std::{
     cmp::Ordering,
     fmt::Display,

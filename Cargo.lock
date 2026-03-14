@@ -113,9 +113,9 @@ dependencies = [
 
 [[package]]
 name = "deprecate-until"
-version = "0.1.1"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a3767f826efbbe5a5ae093920b58b43b01734202be697e1354914e862e8e704"
+checksum = "9d0795c0c5b2cab72b80d75b5cb08bde679e616c67e954669a2476668319ac3a"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -135,20 +135,21 @@ dependencies = [
 
 [[package]]
 name = "ebi_arithmetic"
-version = "0.3.9"
+version = "0.3.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae191f1a01a31e8d535ffbfb081de2dd3710992e277ab9adbdf5f6111fba819b"
+checksum = "8c77487f9da75006b1ccbb84b6850f2f0aa0059b29e3f8903f5ea13df90cf27f"
 dependencies = [
  "anyhow",
  "itertools",
  "malachite",
  "rand",
+ "rand_chacha",
  "serial_test",
 ]
 
 [[package]]
 name = "ebi_optimisation"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "ebi_arithmetic",
  "indexmap",
@@ -506,9 +507,9 @@ dependencies = [
 
 [[package]]
 name = "pathfinding"
-version = "4.14.0"
+version = "4.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59ac35caa284c08f3721fb33c2741b5f763decaf42d080c8a6a722154347017e"
+checksum = "835ad2773f8587ad2d90a0f7f0022ca743dfd5a6a24ea25062f3519c38d2fcfa"
 dependencies = [
  "deprecate-until",
  "indexmap",
@@ -766,18 +767,18 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "2.0.16"
+version = "2.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3467d614147380f2e4e374161426ff399c91084acd2363eaf549172b3d5e60c0"
+checksum = "4288b5bcbc7920c07a1149a35cf9590a2aa808e0bc1eafaade0b80947865fbc4"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "2.0.16"
+version = "2.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c5e1be1c48b9172ee610da68fd9cd2770e7a4056cb3fc98710ee6906f0c7960"
+checksum = "ebc4ee7f67670e9b64d05fa4253e753e016c6c95ff35b89b7941d6b856dec1d5"
 dependencies = [
  "proc-macro2",
  "quote",
