@@ -474,7 +474,7 @@ where
             log::info!("Could not initialize feasible solution");
             return ProblemType::Infeasible;
         }
-        log::debug!("{}", self.visualize_tree_graphviz());
+        // log::debug!("{}", self.visualize_tree_graphviz());
         log::debug!("Potential: {:?}", self.pi);
         let mut iter = 1;
 
@@ -515,9 +515,9 @@ where
 
                 self.update_tree_structure();
                 self.update_potential(); // update the dual solution for the next iteration
-                log::debug!("Potential updated");
+                // log::debug!("Potential updated");
                 log::debug!("Potential: {:?}", self.pi);
-                log::debug!("{}", self.visualize_tree_graphviz());
+                // log::debug!("{}", self.visualize_tree_graphviz());
             }
         }
         log::info!("Network Simplex finished in {} iterations", iter);
