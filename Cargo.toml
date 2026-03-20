@@ -23,7 +23,7 @@ approximatearithmetic = [ "eapproximatearithmetic", "ebi_arithmetic/approximatea
 eapproximatearithmetic = []
 
 [dependencies]
-ebi_arithmetic = "0.3.10"
+ebi_arithmetic = "0.3.11"
 ndarray = "0.17.2"
 sprs = "0.11.4"
 indexmap = "2.13.0"
