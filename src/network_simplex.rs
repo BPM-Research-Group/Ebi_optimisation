@@ -405,7 +405,7 @@ where
                 nodes_output.push_str(", ");
             }
         }
-        log::debug!("nodes: [{}]", nodes_output);
+        // log::debug!("nodes: [{}]", nodes_output);
         let mut arcs_output = String::new();
         for i in 0..self.all_arc_num {
             let source = self.source[i];
@@ -416,7 +416,7 @@ where
                 arcs_output.push_str(", ");
             }
         }
-        log::debug!("arcs: {}", arcs_output);
+        // log::debug!("arcs: {}", arcs_output);
     }
 
     /// DEBUG function
@@ -475,7 +475,7 @@ where
             return ProblemType::Infeasible;
         }
         // log::debug!("{}", self.visualize_tree_graphviz());
-        log::debug!("Potential: {:?}", self.pi);
+        // log::debug!("Potential: {:?}", self.pi);
         let mut iter = 1;
 
         let num_threads = rayon::current_num_threads();
@@ -486,14 +486,14 @@ where
 
         //while self.find_entering_arc() {
         while self.find_entering_arc_par(&pool) {
-            log::debug!("_____________________________\nIteration: {}", iter);
+            // log::debug!("_____________________________\nIteration: {}", iter);
             iter += 1;
 
-            log::debug!(
-                "Entering arc: {}-->{}",
-                self.source[self.in_arc],
-                self.target[self.in_arc]
-            );
+            // log::debug!(
+            //     "Entering arc: {}-->{}",
+            //     self.source[self.in_arc],
+            //     self.target[self.in_arc]
+            // );
 
             self.find_join_node();
             let change = self.find_leaving_arc();
@@ -506,17 +506,17 @@ where
 
             self.change_flow(change);
             if change {
-                log::debug!(
-                    "Leaving arc: {}-->{} with delta {}",
-                    self.source[self.predecessor[self.u_out].unwrap()],
-                    self.target[self.predecessor[self.u_out].unwrap()],
-                    self.delta
-                );
+                // log::debug!(
+                //     "Leaving arc: {}-->{} with delta {}",
+                //     self.source[self.predecessor[self.u_out].unwrap()],
+                //     self.target[self.predecessor[self.u_out].unwrap()],
+                //     self.delta
+                // );
 
                 self.update_tree_structure();
                 self.update_potential(); // update the dual solution for the next iteration
                 // log::debug!("Potential updated");
-                log::debug!("Potential: {:?}", self.pi);
+                // log::debug!("Potential: {:?}", self.pi);
                 // log::debug!("{}", self.visualize_tree_graphviz());
             }
         }
@@ -894,10 +894,10 @@ where
         sigma -= &self.pi[self.u_in];
 
         let end = self.thread[self.last_successor[self.u_in]];
-        log::debug!("u_in: {}, end: {}", self.u_in, end);
+        // log::debug!("u_in: {}, end: {}", self.u_in, end);
         let mut u = self.u_in;
         while u != end {
-            log::trace!("Potential updated, u: {}, end: {}", u, end);
+            // log::trace!("Potential updated, u: {}, end: {}", u, end);
             self.pi[u] += &sigma;
             u = self.thread[u];
         }
@@ -934,7 +934,7 @@ where
         max_cost *= &T::from(self.node_num as i32);
         let art_cost: T = max_cost;
 
-        log::debug!("art_cost identified as: {}", art_cost);
+        // log::debug!("art_cost identified as: {}", art_cost);
 
         // resize all vectors
         self.all_node_num = self.node_num + 1;
@@ -1008,7 +1008,7 @@ where
             // LEQ supply constraints
             self.search_arc_num = self.arc_num + self.node_num;
             let mut f = self.arc_num + self.node_num;
-            log::debug!("node num: {}", self.node_num);
+            // log::debug!("node num: {}", self.node_num);
             for u in 0..self.node_num {
                 self.parent[u] = Some(self.root);
                 self.thread[u] = u + 1;
@@ -1039,7 +1039,7 @@ where
                     self.flow[self.arc_num + u] = T::zero();
                     self.cost[self.arc_num + u] = T::zero();
                     f += 1;
-                    log::debug!("f increased by 1");
+                    // log::debug!("f increased by 1");
                 }
             }
             self.all_arc_num = f;
