@@ -23,13 +23,13 @@ approximatearithmetic = [ "eapproximatearithmetic", "ebi_arithmetic/approximatea
 eapproximatearithmetic = []
 
 [dependencies]
-ebi_arithmetic = "0.3.11"
+ebi_arithmetic = { path = "../Ebi_arithmetic", version = "0.3.10" }
 ndarray = "0.17.2"
 sprs = "0.11.4"
-indexmap = "2.13.0"
-rustc-hash = "2.1.1"
+indexmap = "2.14.0"
+rustc-hash = "2.1.2"
 log = "0.4.29"
-rayon = "1.11.0"
+rayon = "1.12.0"
 parking_lot = "0.12.5"
 pathfinding = "4.15.0"
 
