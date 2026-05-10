@@ -217,6 +217,20 @@ impl MaybeExact for AbnormalFraction {
             }
         }
     }
+
+    fn try_to_exact(_: Self::Exact) -> anyhow::Result<Self>
+    where
+        Self: Sized,
+    {
+        Err(anyhow!("Cannot create an exact value."))
+    }
+
+    fn try_to_approx(_: Self::Approximate) -> anyhow::Result<Self>
+    where
+        Self: Sized,
+    {
+        Err(anyhow!("Cannot create an approximate value."))
+    }
 }
 
 impl PartialOrd for AbnormalFraction {
