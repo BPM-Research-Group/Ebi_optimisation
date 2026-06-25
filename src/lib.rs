@@ -5,7 +5,7 @@ pub mod astar;
 // pub mod linear_programming_ordering;
 // pub mod linear_programming_solver;
 // pub mod linear_programming_sparse;
-pub mod abnormal_fraction;
+// pub mod abnormal_fraction;
 pub mod network_simplex;
 pub mod network_simplex_value_type;
 
