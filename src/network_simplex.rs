@@ -520,7 +520,7 @@ where
                 // log::debug!("{}", self.visualize_tree_graphviz());
             }
         }
-        log::info!("Network Simplex finished in {} iterations", iter);
+        // log::info!("Network Simplex finished in {} iterations", iter);
 
         // check feasibility: any remaining flow on artificial arcs?
         if !guarantee_network_feasibility {
@@ -550,7 +550,7 @@ where
         }
 
         self.problem_type = Some(ProblemType::Optimal);
-        log::info!("Optimal solution found");
+        // log::info!("Optimal solution found");
         return ProblemType::Optimal;
     }
 
@@ -571,16 +571,16 @@ where
             cost -= &self.pi[self.target[e]];
             cost *= self.state[e].value();
 
-            log::trace!(
-                "{}-->{}, cost: {} = {} * ({} + {} - {})",
-                self.source[e],
-                self.target[e],
-                cost,
-                self.state[e].value(),
-                self.cost[e],
-                self.pi[self.source[e]],
-                self.pi[self.target[e]]
-            );
+            // log::trace!(
+            //     "{}-->{}, cost: {} = {} * ({} + {} - {})",
+            //     self.source[e],
+            //     self.target[e],
+            //     cost,
+            //     self.state[e].value(),
+            //     self.cost[e],
+            //     self.pi[self.source[e]],
+            //     self.pi[self.target[e]]
+            // );
             if cost < min_cost {
                 min_cost = cost;
                 self.in_arc = e;
@@ -624,16 +624,16 @@ where
             cost += &self.pi[self.source[e]];
             cost -= &self.pi[self.target[e]];
             cost *= self.state[e].value();
-            log::trace!(
-                "{}-->{}, cost: {} = {} * ({} + {} - {})",
-                self.source[e],
-                self.target[e],
-                cost,
-                self.state[e].value(),
-                self.cost[e],
-                self.pi[self.source[e]],
-                self.pi[self.target[e]]
-            );
+            // log::trace!(
+            //     "{}-->{}, cost: {} = {} * ({} + {} - {})",
+            //     self.source[e],
+            //     self.target[e],
+            //     cost,
+            //     self.state[e].value(),
+            //     self.cost[e],
+            //     self.pi[self.source[e]],
+            //     self.pi[self.target[e]]
+            // );
             if cost < min_cost {
                 min_cost = cost;
                 self.in_arc = e;
